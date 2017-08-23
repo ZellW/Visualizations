@@ -1,4 +1,4 @@
-source("myPrediction.R")
+source("./myPrediction.R")
 
 shinyServer(function(input, output) 
 {
@@ -14,9 +14,9 @@ shinyServer(function(input, output)
         output$wordCloud <- renderImage({
              filename <- normalizePath(file.path("./www",
                                        paste("cloud", input$chooseCloud, ".png", sep = "")))
-             list(src = filename, alt = paste("Image number", input$n))
+             list(src = filename,
+                  alt = paste("Image number", input$n))
              
-        }, 
-        deleteFile = FALSE)
+        }, deleteFile = FALSE)
 
 })

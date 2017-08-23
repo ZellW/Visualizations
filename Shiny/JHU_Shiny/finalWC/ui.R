@@ -14,7 +14,7 @@ shinyUI(navbarPage("JHU Data Science Capstone", theme = shinytheme("united"),
                                                      "No Stop Words" = "2"))
                                  ),
                             mainPanel(
-                                 textInput("text", label = h3("Please enter some words below")),
+                                 textInput("text", label = h3("Please enter some words below:")),
                                  tags$hr(),
                                  tags$h3("I guess the next word might be:"),
                                  #(tags$h4(textOutput("guessedWord")))
@@ -25,17 +25,20 @@ shinyUI(navbarPage("JHU Data Science Capstone", theme = shinytheme("united"),
                             )
                    )
 ),
-tabPanel("About", includeMarkdown("./notes/myPredictionApp.html")
+tabPanel("About", 
+         includeMarkdown("./notes/myPredictionApp.html")
 ),
 
-tabPanel("Text Analytics", includeMarkdown("./notes/textAnalytics.html")
+tabPanel("Text Analytics", 
+         includeMarkdown("./notes/textAnalytics.html")
 ),
 
 tabPanel("How it Works", 
          includeMarkdown("./notes/HowItWorks.html")
 ),
 
-tabPanel("Next Steps", includeMarkdown("./notes/nextSteps.html")
+tabPanel("Next Steps", 
+         includeMarkdown("./notes/nextSteps.html")
 )
 )
 )
