@@ -1,0 +1,19 @@
+---
+title: "Bar Plot with 2 Factors & Gradient Color"
+output:
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+---
+
+
+```{r}
+library(ggplot2)
+df=data.frame(time=as.factor(rep(0.5:9.5,each=10)), roi=rep(1:10,10), area=runif(100, 5.0, 7.5))
+
+df$time <- factor(df$time, levels=rev(levels(df$time)))
+
+ggplot(data=df, aes(y=factor(roi), x=time, fill = area)) + theme_minimal()  + coord_flip() +
+  geom_tile(colour = "white", width = .9, height = 1) + scale_fill_gradient(low="blue", high="red")
+```
+
