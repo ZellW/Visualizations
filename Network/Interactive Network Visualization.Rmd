@@ -1,0 +1,180 @@
+---
+title: Interactive Network Visualization
+author: Cliff Weaver
+output:
+  prettydoc::html_pretty:
+    theme: tactile
+    highlight: github
+---
+
+```{r echo=FALSE, warning=F, message=F}
+if(!require(easypackages)){install.packages("easypackages")}
+library(easypackages)
+packages("tidyverse", "visNetwork", "geomnet", "igraph", prompt = TRUE)
+options(digits = 3)
+knitr::opts_chunk$set(message=FALSE)
+
+setwd("~/GitHub/Visualizations/Network")
+```
+
+# Introduction
+
+`visNetwork`, which uses `vis.js` javascript library and is based on `htmlwidgets.` It’s compatible with Shiny, R Markdown documents and RStudio viewer. `visNetwork` has many adjustments to personalize your network, a pretty output and good performance, which is very important when using the output in Shiny. 
+
+# Data
+
+Use the Les Misérables Characters network. This undirected network contains co-occurrences of characters in Victor Hugo’s novel ‚_Les Misérables‘_. A node represents a character, and an edge between two nodes shows that these two characters appeared in the same chapter of the book. The weight of each link indicates how often such a co-appearance occurred.
+
+#  Data Preparation
+
+Load the dataset lesmis from the package `geomnet.`
+
+To visualize the network between the Les Miserables characters, the package `visNetwork` needs two data frames. One for the nodes and one for the edges of the network.
+
+```{r}
+data(lesmis)
+glimpse(lesmis)
+```
+```{r}
+#Nodes
+nodes <- as.data.frame(lesmis[2])
+glimpse(nodes)
+colnames(nodes) <- c("id", "label")
+
+#id has to be the same like from and to columns in edges
+nodes$id <- nodes$label
+glimpse(nodes)
+```
+```{r}
+#Edges
+edges <- as.data.frame(lesmis[1])
+glimpse(edges)
+colnames(edges) <- c("from", "to", "width")
+```
+
+The following function needs specific names for the columns to detect the right column. For this purpose, edges must be a dataframe with at least one column that indicates in which node an edge starts (from) and where it ends (to). For the nodes, we require at a minimum a unique ID (id) which has to coincide to the from and to entries.
+
+__Nodes:__
+
+- label: A column that defines how a node is labelled
+- value: Defines the size of a node inside the network
+- group: Assigns a node to a group; this can be a result of a cluster analysis or a community detection
+- shape: Defines how a node is presented. For example as a circle, square or triangle
+- color: Defines the color of a node
+- title: Sets the tooltip, which occurs when you hover over a node (this can be HTML or character)
+-shadow: Defines if a node has a shadow or not (TRUE/FALSE)
+
+__Edges:__
+
+- label, title, shadow
+- length, width: Defines the length/width of an edge inside the network
+- arrows: Defines where to set a possible arrow on the edge
+- dashes: Defines if the edges should be dashed or not (TRUE/FALSE)
+- smooth: Smooth lines (TRUE/FALSE)
+
+These are the most important settings. They were made for every single node or edge particularly. To set some configurations for all nodes or edges like the same shape or arrows you can do this later when you specify the output with `visNodes` and `visEdges.` 
+
+Highlight the groups later by adding colors to the edges in the network. Therefore cluster the data with the community detection method `Louvain` and get a group column:
+
+```{r}
+#Create graph for Louvain
+graph <- graph_from_data_frame(edges, directed = FALSE)
+
+#Louvain Comunity Detection
+cluster <- cluster_louvain(graph)
+
+cluster_df <- data.frame(as.list(membership(cluster)))
+cluster_df <- as.data.frame(t(cluster_df))
+cluster_df$label <- rownames(cluster_df)
+glimpse(cluster_df)
+```
+```{r}
+#Create group column
+nodes <- left_join(nodes, cluster_df, by = "label")
+colnames(nodes)[3] <- "group"
+glimpse(nodes)
+```
+
+# Output Options
+
+Start with the simplest outlput and only give the nodes and edges dataframes to the function:
+
+```{r}
+visNetwork(nodes, edges)
+```
+
+Using the pipe operator, customize our network with some other functions like `visNodes`, `visEdges`, `visOptions`, `visLayout` or `visIgraphLayout`:
+
+```{r}
+visNetwork(nodes, edges, width = "100%") %>%
+  visIgraphLayout() %>%
+  visNodes(
+    shape = "dot",
+    color = list(
+      background = "#0085AF",
+      border = "#013848",
+      highlight = "#FF8000"
+    ),
+    shadow = list(enabled = TRUE, size = 10)
+  ) %>%
+  visEdges(
+    shadow = FALSE,
+    color = list(color = "#0085AF", highlight = "#C62F4B")
+  ) %>%
+  visOptions(highlightNearest = list(enabled = T, degree = 1, hover = T),
+             selectedBy = "group") %>% 
+  visLayout(randomSeed = 11)
+```
+
+`visNodes` and `visEdges` describe the overall appearance of the nodes and edges in the network. For example, you can set the shape of all nodes or define the colors of the edges.
+
+When publishing in R, rendering the network can take a long time. To deal with this issue, use `visIgraphfunction.` It decreases plotting time while computing coordinates in advance and provides all available `igraph` layouts.
+
+With `visOptions` you can adjust how the network reacts when you interact with it. 
+
+`visLayout` allows you to define the look of the network. Should it be a hierarchical one or do you want to improve the layout with a special algorithm? Furthermore, you can provide a seed so the network always looks the same when it loa
+ds.
+The package provides much more options for customization. For more details have a look at the [documentation](http://datastorm-open.github.io/visNetwork/).  Also visit the [GitHub Repo](https://github.com/datastorm-open/visNetwork).
+
+# Shiny Integration
+
+To present the interactive results, integrate them into a Shiny app. 
+
+First, save the data for Shiny to use.
+
+```{r}
+save(edges, file = "edges.RData")
+save(nodes, file = "nodes.RData")
+```
+
+
+global.R:
+```{r}
+library(shiny)
+library(visNetwork)
+```
+
+server.R:
+```{r}
+shinyServer(function(input, output) {
+  output$network <- renderVisNetwork({
+    load("nodes.RData")
+    load("edges.RData")
+
+    visNetwork(nodes, edges) %>%
+      visIgraphLayout()
+  })
+})
+```
+
+ui.R:
+```{r}
+shinyUI(
+  fluidPage(
+    visNetworkOutput("network")
+  )
+)
+```
+# References
+
+https://www.statworx.com/de/blog/interactive-network-visualization-with-r/

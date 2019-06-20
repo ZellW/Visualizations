@@ -1,0 +1,395 @@
+---
+title: 'Graph Analysis with tidyverse'
+output:
+  html_document:
+    highlight: pygments
+    theme: spacelab
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+if(!require(easypackages)){install.packages("easypackages")}
+library(easypackages)
+packages("tidyverse", "ggraph", "tidygraph", prompt = FALSE)
+```
+
+# Introduction
+
+raph theory studies relationships between objects in a group. Visually, we can think of a graph as a series of interconnected circles, each representing a member of a group, such as people in a Social Network. Lines drawn between the circles represent a relationship between the members, such as friendships in a Social Network. Graph analysis helps with figuring out things such as the influence of a certain member, or how many friends are in between two members. A more formal definition and detailed explanation of Graph Theory can be found in [Wikipedia](https://en.wikipedia.org/wiki/Graph_theory).
+
+There are two packages that help apply tidy principles to a graph table:
+
+- `tidygraph` - Provides a way for dplyr to interact with graphs
+- `ggraph` - Extension to `ggplot2` for graph analysis
+
+# Get Data
+
+Use a data set that relates to French trains; it contains aggregate daily total trips per connecting stations.
+
+```{r getData}
+url <- "https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2019/2019-02-26/small_trains.csv"
+small_trains <- read_csv(url)
+head(small_trains)
+```
+
+# Data Preparation
+
+Even though it was meant to analyze delays, it would be interesting to use the data to understand how stations connect with each other. A new summarized data set is created, called `routes`, which contains a single entry for each connected station. It also includes the average journey time it takes to go between stations.
+
+```{r}
+routes <- small_trains %>%
+  group_by(departure_station, arrival_station) %>%
+  summarise(journey_time = mean(journey_time_avg)) %>%
+  ungroup() %>%
+  mutate(from = departure_station, 
+         to = arrival_station) %>%
+  select(from, to, journey_time)
+
+routes
+```
+
+The next step is to transform the tidy data set, into a graph table. In order to prepare routes for this transformation, it has to contain two variables specifically named: `from` and `to`, which are the names that tidygraph expects to see. Those variables should contain the name of each member (e.g., “AIX EN PROVENCE TGV”), and the relationship (“AIX EN PROVENCE TGV” -> “PARIS LYON”) .
+
+In graph terminology, a member of the group is called a node (or vertex) in the graph, and a relationship between nodes is called an edge.
+
+```{r}
+graph_routes <- as_tbl_graph(routes)
+
+graph_routes
+```
+
+The `as_tbl_graph()` function splits the routes table into two:
+
+- Node Data - Contains all of the unique values found in the from and to variables. In this case, it is a table with a single column containing the names of all of the stations.
+- Edge Data - Is a table of all relationships between from and to. A peculiarity of tidygraph is that it uses the row position of the node as the identifier for from and to, instead of its original name.
+
+Another interesting thing about `tidygraph` is that it allows us to attach more information about the node or edge in an additional column. In this case, `journey_time` is not really needed to create the graph table, but it may be needed for the analysis we plan to perform. The `as_tbl_graph`() function automatically created the column for us.
+
+Thinking about `graph_routes` as two tibbles inside a larger table graph was a mental breakthrough. At that point, it became evident that `dplyr` needs a way to know which of the two tables (nodes or edges) to perform the transformations on. In `tidygraph`, this is done using the `activate()` function. To showcase this, the nodes table will be “activated” in order to add two new string variables derived from name.
+
+```{r}
+graph_routes <- graph_routes %>%
+  activate(nodes) %>%
+  mutate(
+    title = str_to_title(name),
+    label = str_replace_all(title, " ", "\n")
+    )
+
+graph_routes
+```
+
+It was really impressive how easy it was to manipulate the graph table, because once one of the two tables are activated, all of the changes can be made using `tidyverse` tools. The same approach can be used to extract data from the graph table. In this case, a list of all the stations is pulled into a single character vector.
+
+```{r}
+stations <- graph_routes %>%
+  activate(nodes) %>%
+  pull(title)
+
+stations
+```
+
+# Visualizing
+
+In graphs, the absolute position of the each node is not as relevant as it is with other kinds of visualizations. A very minimal `ggplot2` theme is set to make it easier to view the plotted graph.
+
+```{r}
+thm <- theme_minimal() + theme(legend.position = "none", axis.title = element_blank(),
+                               axis.text = element_blank(), panel.grid = element_blank(),
+                               panel.grid.major = element_blank(),) 
+theme_set(thm)
+```
+
+`To create the plot, start with `ggraph()` instead of `ggplot2()`. The ggraph package contains geoms that are unique to graph analysis. The package contains `geoms` to specifically plot nodes, and other geoms for edges.
+
+As a first basic test, the point geom will be used, but instead of calling `geom_point()`, we call `geom_node_point()`. The edges are plotted using `geom_edge_diagonal()`.
+
+```{r}
+graph_routes %>%
+  ggraph(layout = "kk") +
+    geom_node_point() +
+    geom_edge_diagonal() 
+```
+
+To make it easier to see where each station is placed in this plot, the `geom_node_text()` is used. Just as with regular geoms in `ggplot2`, other attributes such as size, color, and alpha can be modified.
+
+```{r}
+graph_routes %>%
+  ggraph(layout = "kk") +
+    geom_node_text(aes(label = label, color = name), size = 3) +
+    geom_edge_diagonal(color = "gray", alpha = 0.4) 
+```
+
+# Morphing time!
+
+The second mental leap was understanding how a graph algorithm is applied. Typically, the output of a model function is a model object, not a data object. With `tidygraph`, the process begins and ends with a graph table. The steps are these:
+
+- Start with a graph table
+- Temporarily transform the graph to comply with the model that is requested (`morph()`)
+- Add additional transformations to the morphed data using `dplyr` (optional)
+- Restore the original graph table, but modified to keep the changes made during the morph
+
+The shortest path algorithm defines the “length” as the number of edges in between two nodes. There may be multiple routes to get from point A to point B, but the algorithm chooses the one with the fewest number of “hops”. The way to call the algorithm is inside the `morph()` function. Even though `to_shortest_path()` is a function in itself, and it is possible run it without `morph()`, it is not meant to be used that way. In the example, the `journey_time` is used as weights to help the algorithm find an optimal route between the Arras and the Nancy stations. The print output of the morphed graph will not be like the original graph table.
+
+```{r eval=FALSE}
+from <- which(stations == "Arras")
+to <-  which(stations == "Nancy")
+
+shortest <- graph_routes %>% morph(to_shortest_path, from, to, weights = journey_time)
+
+shortest
+```
+
+It is possible to make more transformations with the use of `activate()` and `dplyr` functions. The results can be previewed, or committed back to the original R variable using `unmorph()`. By default, nodes are active in a morphed graph, so there is no need to set that explicitly.
+
+```{r}
+shortest %>%
+  mutate(selected_node = TRUE) %>%
+  unmorph()
+```
+
+While it was morphed, only the few nodes that make up the connections between the Arras and Nancy stations were selected. A `simple mutate()` adds a new variable called `selected_node`, which tags those nodes with TRUE. The new variable and value is retained once the rest of the nodes are restored via the `unmorph()` command.
+
+To keep the change, the shortest variable is updated with the changes made to both edges and nodes.
+
+```{r}
+shortest <- shortest %>%
+  mutate(selected_node = TRUE) %>%
+  activate(edges) %>%
+  mutate(selected_edge = TRUE) %>%
+  unmorph() 
+```
+
+The next step is to coerce each `NA` into a 1, and the shortest route into a 2. This will allow us to easily re-arrange the order that the edges are drawn in the plot, ensuring that the route will be drawn at the top.
+
+```{r}
+shortest <- shortest %>%
+  activate(nodes) %>%
+  mutate(selected_node = ifelse(is.na(selected_node), 1, 2)) %>%
+  activate(edges) %>%
+  mutate(selected_edge = ifelse(is.na(selected_edge), 1, 2)) %>%
+  arrange(selected_edge)
+
+shortest
+```
+
+A simple way to plot the route is to use the `selected_` variables to modify the alpha. This will highlight the shortest path, without completely removing the other stations. This is a personal design choice, so experimenting with different ways of highlighting the results is recommended.
+
+```{r}
+shortest %>%
+  ggraph(layout = "kk") +
+    geom_edge_diagonal(aes(alpha = selected_edge), color = "gray") +
+    geom_node_text(aes(label = label, color =name, alpha = selected_node ), size = 3) 
+```
+
+The `selected_` fields can also be used in other `dplyr` functions to analyze the results. For example, to know the aggregate information about the trip, `selected_edge` is used to filter the edges, and then the totals can be calculated. There is no `summarise()` function for graph tables; this make sense because the graph table would become a summarized table with such a function. Since the end result we seek is a total rather than another graph table, a simple `as_tibble()` command will coerce the edges, which will then allows us to finish the calculation.
+
+```{r}
+shortest %>%
+  activate(edges) %>%
+  filter(selected_edge == 2) %>%
+  as_tibble() %>%
+  summarise(
+    total_stops = n() - 1,
+    total_time = round(sum(journey_time) / 60))
+```
+
+# Re-using the code
+
+To compile most of the code in a single chunk, here is an example of how to re-run the shortest path for a different set of stations: the Laval and Montpellier stations.
+
+```{r}
+from <- which(stations == "Montpellier")
+to <-  which(stations == "Laval")
+
+shortest <- graph_routes %>%
+  morph(to_shortest_path, from, to, weights = journey_time) %>%
+  mutate(selected_node = TRUE) %>%
+  activate(edges) %>%
+  mutate(selected_edge = TRUE) %>%
+  unmorph() %>%
+  activate(nodes) %>%
+  mutate(selected_node = ifelse(is.na(selected_node), 1, 2)) %>%
+  activate(edges) %>%
+  mutate(selected_edge = ifelse(is.na(selected_edge), 1, 2)) %>%
+  arrange(selected_edge)
+
+shortest %>%
+  ggraph(layout = "kk") +
+    geom_edge_diagonal(aes(alpha = selected_edge), color = "gray") +
+    geom_node_text(aes(label = label, color =name, alpha = selected_node ), size = 3)
+```
+
+Additional, the same code can be recycled to obtain the trip summarized data.
+
+```{r}
+shortest %>%
+  activate(edges) %>%
+  filter(selected_edge == 2) %>%
+  as_tibble() %>%
+  summarise(
+    total_stops = n() - 1,
+    total_time = round(sum(journey_time) / 60) )
+```
+        3         10
+
+# Shiny app
+To see how to use this kind of analysis inside Shiny, please refer to the application below. It lets the user select two stations, and it returns the route, plus the summarized data. The source code is embedded in the app.
+
+## Shiny Code
+
+```{r shinyCode, eval=FALSE}
+title: "French Train stats"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    vertical_layout: fill
+    theme: bootstrap
+    source_code: embed
+    social: [ "twitter" ]
+runtime: shiny_prerendered
+---
+
+```{r setup, include=FALSE, eval=FALSE}
+library(flexdashboard)
+library(tidygraph)
+library(ggraph)
+library(dplyr)
+library(readr)
+library(stringr)
+library(shiny)
+
+small_trains <- read_rds("small.rds")
+
+st <- small_trains %>%
+  group_by(departure_station, arrival_station) %>%
+  summarise(journey_time = mean(journey_time_avg)) %>%
+  ungroup() %>%
+  mutate(from = departure_station, 
+         to = arrival_station) %>%
+  select(from, to, journey_time)
+
+
+tg_small_trains <- as_tbl_graph(st) %>%
+  activate(nodes) %>%
+  mutate(
+    title = str_to_title(name),
+    label = str_replace_all(title, " ", "\n")
+    )
+
+stations <- tg_small_trains %>%
+  activate(nodes) %>%
+  pull(title)
+
+sts <- as.list(seq_along(stations))
+names(sts) <- stations
+
+```
+
+Column {.sidebar}
+-----------------------------------------------------------------------
+
+```{r}
+selectInput(
+  "station1", label = "Station 1:",
+  choices = sts,
+  selected = "34",
+  selectize = FALSE)
+```
+
+```{r}
+selectInput(
+  "station2", label = "Station 2:",
+  choices = sts,
+  selected = "28",
+  selectize = FALSE)
+```
+
+Row  {data-height=100}
+-----------------------------------------------------------------------
+
+### Trip total (Hrs.)
+
+```{r}
+valueBoxOutput("trip")
+```
+
+### Total stops
+
+```{r}
+valueBoxOutput("stops")
+```
+
+Row
+-----------------------------------------------------------------------
+
+### Shortest path
+
+```{r}
+plotOutput("map")
+```
+
+
+```{r server}
+thm <- theme_minimal() +
+  theme(
+    legend.position = "none",
+     axis.title = element_blank(),
+     axis.text = element_blank(),
+     panel.grid = element_blank(),
+     panel.grid.major = element_blank(),
+  ) 
+theme_set(thm)
+
+shortest <- reactive({
+  station1 <- as.integer(input$station1)
+  station2 <- as.integer(input$station2)
+  
+  tg_small_trains %>%
+      morph(to_shortest_path, station1, station2, weights = journey_time) %>%
+      mutate(selected_path = 1) %>%
+      activate(edges) %>%
+      mutate(selected_path = 1) %>%
+      unmorph()  %>%
+      activate(nodes) %>%
+      mutate(selected_path = ifelse(is.na(selected_path), 1, 2)) %>%
+      activate(edges) %>%
+      mutate(selected_path = ifelse(is.na(selected_path), 1, 2)) %>%
+      arrange(selected_path)
+  })
+
+output$trip <- renderValueBox({
+  total_time <- shortest() %>%
+  activate(edges) %>%
+  filter(selected_path == 2) %>%
+  pull(journey_time) %>%
+  sum()
+  valueBox(value = round(total_time / 60), icon = "fa-train")
+
+})
+
+output$stops <- renderValueBox({
+  stops <- shortest() %>%
+  activate(edges) %>%
+  filter(selected_path == 2) %>%
+  pull(journey_time) 
+  valueBox(value = length(stops) - 1, icon = "fa-hand-paper", color = "#009E73")
+
+})
+
+output$map <- renderPlot({
+  shortest() %>%
+   ggraph(layout = "kk") +
+   geom_edge_diagonal(aes(alpha = selected_path), color = "#999999") +
+   geom_node_text(aes(label = label, color =name, alpha = selected_path, size = 12 ))
+ })
+```
+
+# Reference
+
+https://beta.rstudioconnect.com/content/4606/
+
+
