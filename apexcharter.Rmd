@@ -1,0 +1,72 @@
+---
+title: "Using apexcharts.js"
+output:
+  prettydoc::html_pretty:
+    theme: Architect
+    highlight: github
+---
+
+```{r message=FALSE, warning=FALSE}
+setwd("~/R/Complete")
+if(!require(easypackages)){install.packages("easypackages")}
+library(easypackages)
+packages("tidyverse","apexcharter", prompt = FALSE)
+
+# devtools::install_github("dreamRs/apexcharter")
+```
+
+# Introduction
+
+[apexchart.js](https://apexcharts.com/) is a modern JavaScript charting library to build interactive charts and visualizations with simple API. apexcharter is built as a htmlwidget (R Package) for apexchart.js 
+
+# Examples
+
+## Simple Example
+
+The main function of apexcharter is the apex() function whose first argument is data. Thus, enabling the support of pipe %>% operator. The second argument is mapping – aesthetics (x & y) and the third one is type of the chart – which takes multiple values like scatter, bar, line and much more.
+
+```{r}
+mtcars %>% count(cyl) %>% apex(type = "bar", mapping = aes(x = "cyl", y = n))
+```
+
+## Building Interactive Heatmap / Correlation Plot
+
+Visualize a Heatmap (of Correlation Plot) of numeric columns of mtcars dataset. To do that, we’ve to first select the numeric columns which we’ll do with select_if(is.numeric) and then we’ve to build the correlation matrix which the base-R function cor() does it smoothly.
+
+Now that we’ve got a matrix let’s convert it to a data.frame and for us to draw a heatmap – we need 3 things primarily:
+
+- x-axis – categorical
+- y-axis – categorical
+- ill value – continuous
+
+Convert the rownames of the resultant dataframe to a column and then convert the wide format data into long format using `pivot_longer()`.
+
+At this point our data is in the desirable format for a heatmap. Simply for aesthetics improvement, let’s round off the correlation values.
+
+Finally, use `apex()` function with `type = 'heatmap'` that gives us a color-filled heatmap (that’s also interactive).
+
+```{r}
+mtcars %>% select_if(is.numeric) %>% cor() %>% as.data.frame() %>% 
+  rownames_to_column("col") %>% 
+  pivot_longer(cols = -col, names_to = "type") %>% 
+  mutate(value = round(value,2)) %>% 
+  apex(type = "heatmap", mapping = aes(x = col, y = type, fill = value)) 
+```
+
+> [How to reshape a dataframe from wide to long or long to wide format](https://www.programmingwithr.com/how-to-reshape-a-dataframe-from-wide-to-long-or-long-to-wide-format/)
+
+> Requires [current tidyr version](https://github.com/tidyverse/tidyr)
+
+## Time-Series (Line) Graph
+
+If there’s a plot where Interactive Charts are incredibly valuable, I think it’s Time-Series Graph where labelling on traditional (static) chart would sometimes make the chart clunky and less readable.
+
+Build an Interactive Time-series plot with the apexcharter library. As you can see below, all it takes is a dataframe with a column denoting the time field and another column with the actual value for that time.
+
+```{r}
+df <- data.frame(Y=as.matrix(EuStockMarkets), date=time(EuStockMarkets))
+
+df %>% apex(type = "line", mapping = aes(x = date, y = Y.DAX)) 
+```
+
+Reference:  https://www.programmingwithr.com/interactive-visualization-in-r-with-apexcharter/

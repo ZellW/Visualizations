@@ -1,0 +1,101 @@
+---
+title: "Improve Boxplot Visualizations"
+output:
+  prettydoc::html_pretty:
+    theme: Architect
+    highlight: github
+---
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+#setwd("~/GitHub/MachineLearning")
+if(!require(easypackages)){install.packages("easypackages")}
+library(easypackages)
+packages("dplyr", "hrbrthemes", "gapminder", prompt = FALSE)
+
+#install.packages("ggeconodist", repos = "https://cinc.rud.is")
+library(ggeconodist)
+
+# devtools::install_github("thomasp85/patchwork")
+library(patchwork)
+```
+
+# Introduction
+
+
+```{r message=FALSE, warning=FALSE}
+ggplot(mammogram_costs, aes(x = city)) +
+  geom_econodist(
+    aes(ymin = tenth, median = median, ymax = ninetieth), stat = "identity"
+  ) +
+  scale_y_continuous(expand = c(0,0), position = "right", limits = range(0, 800)) +
+  coord_flip() +
+  labs(
+    x = NULL, y = NULL,
+    title = "Mammoscams",
+    subtitle = "United States, prices for a mammogram*\nBy metro area, 2016, $",
+    caption = "*For three large insurance companies\nSource: Health Care Cost Institute"
+  ) +
+  theme_econodist() -> gg
+
+grid.newpage()
+left_align(gg, c("subtitle", "title", "caption")) %>% 
+  add_econodist_legend(econodist_legend_grob(), below = "subtitle") %>% 
+  grid.draw()
+```
+
+```{r message=FALSE, warning=FALSE}
+p <- ggplot(mpg, aes(class, hwy)) + theme_ipsum_rc()
+
+(p + geom_boxplot()) + (p + geom_econodist(width = 0.25)) + plot_layout(ncol = 1)
+```
+
+```{r message=FALSE, warning=FALSE}
+(p + geom_boxplot() + coord_flip()) +
+(p + geom_econodist(tenth_col = ft_cols$blue, ninetieth_col = ft_cols$red) +
+   coord_flip()) +
+  plot_layout(ncol = 1)
+```
+
+```{r message=FALSE, warning=FALSE}
+(p + geom_boxplot(aes(fill = factor(drv)))) +
+  (p + geom_econodist(aes(fill = factor(drv)))) +
+  plot_layout(ncol = 1)
+```
+
+```{r message=FALSE, warning=FALSE, fig.height=12}
+gapminder %>%
+  filter(year %in% c(1952, 1962, 1972, 1982, 1992, 2002)) %>%
+  filter(continent != "Oceania") %>%
+  ggplot(aes(x = factor(year), y = lifeExp, fill = continent)) +
+  geom_econodist(
+    median_point_size = 1.2,
+    tenth_col = "#b07aa1",
+    ninetieth_col = "#591a4f",
+    show.legend = FALSE
+  ) +
+  ggthemes::scale_fill_tableau(name = NULL) +
+  coord_flip() +
+  labs(
+    x = "Year", title = "Life Expectancy", y = NULL,
+    caption = "Example borrowed from @cmdline_tips"
+  ) +
+  facet_wrap(~continent, nrow = 4) +
+  theme_ipsum_rc() -> gmgg
+
+grid.newpage()
+gmgg %>% 
+  add_econodist_legend(
+    econodist_legend_grob(
+      tenth_col = "#b07aa1",
+      ninetieth_col = "#591a4f",
+    ), 
+    below = "axis-b-1-4", 
+    just = "right"
+  ) %>% 
+  grid.draw()
+```
+
+# References
+
+https://rud.is/b/2019/07/15/quick-hit-a-different-diminutive-look-at-distributions-with-ggeconodist/
+https://cinc.rud.is/web/packages/ggeconodist/

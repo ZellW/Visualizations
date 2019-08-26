@@ -1,0 +1,141 @@
+---
+title: "Terrific Segmented Column Charts"
+output:
+  prettydoc::html_pretty:
+    theme: Architect
+    highlight: githubb
+---
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+#setwd("~/GitHub/MachineLearning")
+if(!require(easypackages)){install.packages("easypackages")}
+library(easypackages)
+packages("tidyverse", "hrbrthemes", prompt = FALSE)
+
+#devtools::install_git("https://git.rud.is/hrbrmstr/ggchicklet.git")
+library(ggchicklet)
+```
+
+# Introduction
+
+Recreate the visualizations the NYT provided following the first U.S. Democratic debates of the 2020 election season.
+
+```{r message=FALSE, warning=FALSE}
+data("debates2019")
+
+count(debates2019, speaker, wt=elapsed, sort=TRUE) %>%
+  mutate(speaker = fct_reorder(speaker, n, sum, .desc=FALSE)) %>%
+  mutate(speaker = fct_inorder(speaker) %>% fct_rev()) %>%
+  ggplot(aes(speaker,n)) +  geom_col() +  scale_y_comma(position = "right") +
+  coord_flip() +  labs(x = NULL, y = "Minutes Spoken") +  theme_ipsum_rc(grid="X")
+```
+
+If we want to see the same basic view but include how much time each speaker spent on each topic, we can also do that without much effort:
+```{r message=FALSE, warning=FALSE}
+count(debates2019, speaker, topic, wt=elapsed, sort=TRUE) %>%
+  mutate(speaker = fct_reorder(speaker, n, sum, .desc=FALSE)) %>%
+  ggplot(aes(speaker, n , fill = topic)) +
+  geom_col() +  scale_y_comma(position = "right") +
+  ggthemes::scale_fill_tableau("Tableau 20", name = NULL) +
+  coord_flip() +  labs(x = NULL, y = "Minutes Spoken") +
+  theme_ipsum_rc(grid="X") +  theme(legend.position = "bottom")
+```
+
+By default `geom_col()` is going to use the fill aesthetic to group the bars and use the default sort order to stack them together.
+
+We can also get a broken out view by not doing the `count()` and just letting the segments group together and use a white bar outline to keep them distinct:
+
+```{r message=FALSE, warning=FALSE}
+debates2019 %>%
+  mutate(speaker = fct_reorder(speaker, elapsed, sum, .desc=FALSE)) %>%
+  ggplot(aes(speaker, elapsed, fill = topic)) +
+  geom_col(color = "white") +  scale_y_comma(position = "right") +
+  ggthemes::scale_fill_tableau("Tableau 20", name = NULL) +
+  coord_flip() +  labs(x = NULL, y = "Minutes Spoken") +
+  theme_ipsum_rc(grid="X") +  theme(legend.position = "bottom")
+```
+
+While I liked the rounded rectangle aesthetic, I also really liked how the @nytimes ordered the segments by when the topics occurred during the debate. For other types of chicklet charts you don’t need the grouping variable to be a time-y whime-y column, just try to use something that has a sane ordering characteristic to it:
+
+```{r message=FALSE, warning=FALSE}
+debates2019 %>%
+  mutate(speaker = fct_reorder(speaker, elapsed, sum, .desc=FALSE)) %>%
+  ggplot(aes(speaker, elapsed, group = timestamp, fill = topic)) +
+  geom_col(color = "white", position = position_stack(reverse = TRUE)) +
+  scale_y_comma(position = "right") +
+  ggthemes::scale_fill_tableau("Tableau 20", name = NULL) +
+  coord_flip() +  labs(x = NULL, y = "Minutes Spoken") +
+  theme_ipsum_rc(grid="X") +  theme(legend.position = "bottom")
+```
+
+That last chart is about as far as you could go to reproduce the @nytimes look-and-feel without jumping through some serious gg-hoops.
+
+I had made a rounded rectangle hidden geom to make rounded-corner tiles for the `{statebins} package` so making a version of `ggplot2::geom_col()` (which I also added to {ggplot2}) was pretty straightforward. There are some key differences in the defaults of `geom_chicklet()`:
+
+- a “white” stroke for the chicklet/segment (geom_col() has NA for the stroke)
+- automatic reversing of the group order (geom_col() uses the standard sort order)
+- radius setting of unit(3, "px") (change this as you need)
+- chicklet legend geom (b/c they aren’t bars or points)
+
+You likely just want to see it in action, so here it is without further adieu:
+
+```{r message=FALSE, warning=FALSE, fig.height=12}
+debates2019 %>%
+  mutate(speaker = fct_reorder(speaker, elapsed, sum, .desc=FALSE)) %>%
+  ggplot(aes(speaker, elapsed, group = timestamp, fill = topic)) +
+  geom_chicklet(width = 0.75) +
+  scale_y_continuous(
+        expand = c(0, 0.0625), position = "right",
+        breaks = seq(0, 14, 2), labels = c(0, sprintf("%d min.", seq(2, 14, 2))) ) +
+  ggthemes::scale_fill_tableau("Tableau 20", name = NULL) +
+  coord_flip() +
+      labs(x = NULL, y = NULL, fill = NULL,
+           title = "How Long Each Candidate Spoke",
+           subtitle = "Nights 1 & 2 of the June 2019 Democratic Debates",
+           caption = "Each bar segment represents the length of a candidate’s response to a question.\n\nOriginals <https://www.nytimes.com/interactive/2019/admin/100000006581096.embedded.html?>\n<https://www.nytimes.com/interactive/2019/admin/100000006584572.embedded.html?>\nby @nytimes Weiyi Cai, Jason Kao, Jasmine C. Lee, Alicia Parlapiano and Jugal K. Patel") +
+      theme_ipsum_rc(grid="X") +
+      theme(axis.text.x = element_text(color = "gray60", size = 10)) +
+      theme(legend.position = "bottom")
+```
+
+Yes, I upped the ggplot2 tweaking a bit to get closer to the @nytimes (FWIW I like the Y gridlines, YMMV) but didn’t have to do much else to replace geom_col() with geom_chicket(). You’ll need to play with the segment width value depending on the size of your own, different plots to get the best look (just like you do with any other geom).
+
+Astute, intrepid readers will note that the above chart has all the topics whereas the @nytimes just has a few. We can do the grouping of non-salient topics into an “Other” category with forcats::fct_other() and make a manual fill scale from the values stolen fromused in homage from the @nytimes:
+
+```{r message=FALSE, warning=FALSE, fig.height=12}
+debates2019 %>%
+  mutate(speaker = fct_reorder(speaker, elapsed, sum, .desc=FALSE)) %>%
+  mutate(topic = fct_other(
+    topic,
+    c("Immigration", "Economy", "Climate Change", "Gun Control", "Healthcare", "Foreign Policy")) ) %>%
+  ggplot(aes(speaker, elapsed, group = timestamp, fill = topic)) +
+  geom_chicklet(width = 0.75) +
+  scale_y_continuous(
+        expand = c(0, 0.0625), position = "right",
+    breaks = seq(0, 14, 2), labels = c(0, sprintf("%d min.", seq(2, 14, 2)))  ) +
+  scale_fill_manual(
+        name = NULL,
+        values = c(
+              "Immigration" = "#ae4544",
+              "Economy" = "#d8cb98",
+              "Climate Change" = "#a4ad6f",
+              "Gun Control" = "#cc7c3a",
+              "Healthcare" = "#436f82",
+              "Foreign Policy" = "#7c5981",
+              "Other" = "#cccccc"),
+        breaks = setdiff(unique(debates2019$topic), "Other") ) +
+       guides(fill = guide_legend(nrow = 1) ) +
+      coord_flip() +
+      labs(x = NULL, y = NULL, fill = NULL,
+           title = "How Long Each Candidate Spoke",
+           subtitle = "Nights 1 & 2 of the June 2019 Democratic Debates",
+           caption = "Each bar segment represents the length of a candidate’s response to a question.\n\nOriginals <https://www.nytimes.com/interactive/2019/admin/100000006581096.embedded.html?>\n<https://www.nytimes.com/interactive/2019/admin/100000006584572.embedded.html?>\nby @nytimes Weiyi Cai, Jason Kao, Jasmine C. Lee, Alicia Parlapiano and Jugal K. Patel") +
+      theme_ipsum_rc(grid="X") +
+      theme(axis.text.x = element_text(color = "gray60", size = 10)) +
+      theme(legend.position = "top")
+```
+
+Reference:
+
+https://rud.is/b/2019/06/30/make-refreshing-segmented-column-charts-with-ggchicklet/
+https://cinc.rud.is/web/packages/ggchicklet/
