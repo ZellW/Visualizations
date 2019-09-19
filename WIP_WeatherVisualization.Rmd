@@ -1,0 +1,113 @@
+---
+title: "Charlotte - Weather - Always Guessing"
+output:
+      html_document:
+      theme: paper
+highlight: kate
+---
+ 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+ 
+```{r prep}
+library(tidyverse)
+library(tidybayes)
+library(patchwork)
+library(cowplot)
+library(lubridate)
+```
+ 
+# Data
+ 
+https://www.ncdc.noaa.gov/cdo-web/
+https://www.ncdc.noaa.gov/cdo-web/datasets/GHCND/locations/CITY:US370005/detail
+https://cran.r-project.org/web/packages/rnoaa/vignettes/ncdc_vignette.html
+ 
+```{r}
+weather_data <- read.csv("data/CLT_Weather2.csv") %>% select(-STATION, -NAME)
+glimpse(weather_data)
+```
+ 
+ 
+```{r data}
+weather_data <- weather_data %>% 
+     mutate(DATE = ymd(DATE)) %>% 
+     mutate(date = lubridate::ymd(DATE), year = lubridate::year(DATE), month = lubridate::month(DATE)) %>% 
+     select(-DATE) %>%
+     mutate(TAVG = (TMAX + TMIN)/2) %>% 
+     select(date, year, month, TAVG:TMIN, everything())
+head(weather_data)
+```
+ 
+```{r echo=FALSE, eval=FALSE, fig.height=8}
+rcartocolor::display_carto_all()
+ 
+#http://www.sthda.com/english/wiki/colors-in-r
+```
+ 
+ 
+```{r plot, fig.width = 14, fig.height = 12}
+plot <- 
+      weather_data %>% 
+      #filter(date %in% seq(as.Date("2018-09-08"), as.Date("2019-09-07"), by = 1)) %>% 
+      ggplot(aes(TMAX, month)) +
+      tidybayes::stat_intervalh(.width = c(.1, .25, .5, .75, 1), show.legend = F) +
+      rcartocolor::scale_color_carto_d(palette = "RedOr") + 
+      geom_halfeyeh(aes(TMAX, month + .06), 
+                    .width = .0, fill = "#FF9999", alpha = 0.2, 
+                    size = 0.7, point_alpha = 2) +
+      coord_flip(ylim = c(0.5, 13)) +
+      scale_x_continuous(expand = c(0, 0), limits = c(20, 110), 
+                         breaks = seq(20, 110, by = 5), 
+                         labels = glue::glue("{seq(20, 110, by = 5)}°F")) + 
+      scale_y_continuous(expand = c(0, 0), breaks = 1:12,
+                         labels = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul",
+                                    "Aug", "Sept", "Oct", "Nov", "Dec")) +
+      labs(x = "", y = "") +
+      theme(panel.grid.minor = element_blank(),
+            panel.grid.major.x = element_blank(),
+            panel.grid.major.y = element_line(size = 0.1),
+            axis.text.x = element_text(size = 11, face = "bold"),
+            axis.text.y = element_text(size = 9, color = "grey65"))
+ 
+legend_text <- 
+      tibble(xt = c(5, 4.125, 3.125, 1.875, 0.625, 7.5), yt = rep(1.02, 6),
+            text = c("10%", "25%", "50%", "75%", "100%", "of measured temperatures fall in this range"))
+ 
+legend <- ggplot(data = tibble(x = 0:10, y = rep(1, 11)), aes(x, y)) + 
+  stat_intervalh(.width = c(.1, .25, .5, .75, 1), show.legend = F) +
+  rcartocolor::scale_color_carto_d(palette = "RedOr") +
+  coord_cartesian(ylim = c(0.9, 1.1)) +
+  geom_text(data = legend_text, aes(xt, yt, label = text), color = "grey65", size = 3) +
+      theme_void()
+ 
+title <- ggplot(data.frame(x = 1:2, y = 1:10)) +
+      labs(x = NULL, y = NULL,
+           title = "Temperatures Charlotte, NC 2010-2018",
+           subtitle = "Range and distribution of maximum daily temperatures per month") +
+      theme(line = element_blank(),
+            plot.title = element_text(size = 26, hjust = 0, face = "bold"),
+            plot.subtitle = element_text(size = 13, hjust = 0, color = "grey65"),
+            panel.background = element_rect(fill = "transparent", color = "transparent"),
+            plot.background = element_rect(fill = "transparent", color = "transparent"),
+            panel.border = element_rect(color = "transparent"),
+            axis.text = element_blank())
+ 
+caption <- ggplot(data.frame(x = 1:2, y = 1:10)) +
+      labs(x = NULL, y = NULL, 
+           caption = "Cliff Weaver  |  Data: NOAA") +
+      theme(line = element_blank(),
+            plot.caption = element_text(size = 10, color = "grey65"),
+            panel.background = element_rect(fill = "transparent", color = "transparent"),
+            plot.background = element_rect(fill = "transparent", color = "transparent"),
+            panel.border = element_rect(color = "transparent"),
+            axis.text = element_blank())
+ 
+plot_ins <- ggdraw(plot) + draw_plot(legend, .275, .01, .525, .3)
+ 
+title + plot_ins + caption + plot_layout(widths = c(0, 1, 0))
+ 
+#ggsave(here::here("plots", "2019-09", "CLT_Weather.pdf"), 
+#       width = 13, height = 8, device = cairo_pdf)
+```

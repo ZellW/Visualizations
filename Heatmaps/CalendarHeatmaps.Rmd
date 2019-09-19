@@ -1,0 +1,161 @@
+---
+title: 'Calendar Heatmaps'
+output:
+  rmdformats::readthedown:
+    highlight: pygments
+    code_folding: show
+---
+<style type="text/css">
+p{ /* Normal  */
+   font-size: 14px;
+   line-height: 18px;}
+body{ /* Normal  */
+   font-size: 14px;}
+td {  /* Table  */
+   font-size: 12px;}
+h1 { /* Header 1 */
+ font-size: 26px;
+ color: #4294ce;}
+h2 { /* Header 2 */
+ font-size: 22px;}
+h3 { /* Header 3 */
+ font-size: 18px;}
+code.r{ /* Code block */
+  font-size: 12px;}
+pre { /* Code block */
+  font-size: 12px}
+#table-of-contents h2 {
+  background-color: #4294ce;}
+#table-of-contents{
+  background: #688FAD;}
+#nav-top span.glyphicon{
+  color: #4294ce;}
+#postamble{
+  background: #4294ce;
+  border-top: ;}
+</style>
+
+```{r echo=FALSE, warning=F, message=F}
+if(!require(easypackages)){install.packages("easypackages")}
+library(easypackages)
+packages("tidyverse", "lubridate", "quantmod", "scales", "zoo", prompt = T)
+
+set.seed(123)
+options(digits = 3)
+```
+
+# Introduction
+
+Calendar heatmaps are a neglected, but valuable, way of representing time series data. Their chief advantage is in allowing the viewer to visually process trends in categorical or continuous data over a period of time, while relating these values to their month, week, and weekday context - something that simple line plots do not efficiently allow for. If you are displaying data on staffing levels, stock returns, on-time performance for transit systems, or any other one dimensional data, a calendar heatmap can do wonders for helping your stakeholders note patterns in the interaction between those variables and their calendar context.
+
+# Data
+
+Use stock data in the form of daily closing prices for the SPY - SPDR S&P 500 ETF, the most popular exchange traded fund in the world. It is not necessary to have any familiarity with ETF’s or stocks.
+
+`Quantmod` - `getSymbols` takes a stock ticker parameter, a flag to determine whether we want a variable containing the data generated automatically without arrow assignment (`auto.assign`), and the start date of the time series of stock prices that we want to retrieve (`from`).
+
+```{r message=FALSE}
+stock_xts <- getSymbols("SPY", auto.assign = FALSE, from="2018-01-01")
+```
+
+`Quantmod` returns an `XTS` object - not a dataframe. `XTS` objects are similar in nature to dataframes and tibbles, but are optimized for time series data, and unlike tibbles and dataframes, are not compatible with `tidyverse` functions.
+
+```{r}
+class(stock_xts)
+```
+
+First convert it to a dataframe using the `fortify.zoo` function. Note that while it is possible to convert an `xts` object to a dataframe with the `as_data_frame` or `as.data.frame` functions, these will drop the index, whereas `fortify.zoo` retains the index as the first column when it is converted.
+
+```{r}
+stock_df <- fortify.zoo(stock_xts)
+class(stock_df)
+```
+
+```{r}
+head(stock_df)
+```
+
+## Calculating & Transforming Columns
+
+- Add year and month columns
+- Add `wkday` column that will form the y axis of our calendar heatmap
+- Add a day column representing day of month (the values from which will appear within the squares of the plot)
+- Add week column (week of year) that will form the x axis
+- return a column showing the percentage change in value from the previous day when we map it to a color palette
+
+```{r}
+stock_df %>%
+  mutate(year = year(Index),
+         month = month(Index, label = TRUE),
+         wkday = fct_relevel(wday(Index, label=TRUE),
+                             c("Mon", "Tue","Wed","Thu","Fri","Sat","Sun")),
+         day = day(Index),
+         wk = format(Index, "%W"),
+         returns = (.[[5]] - lag(.[[5]]))/lag(.[[5]])) %>%
+  select(year, month, wkday, day, wk, returns) 
+```
+
+- Using `fct_relevel` on the output of `wday` to specify the order of the days. On the y axis of the calendar heatmap, want days to start from Monday at the bottom, and not Sunday (which is the default ordering that `lubridate::wday` produces).
+
+- Passing the Index column. This unix `strftime` code indicates that we want the week number of the date, with the weeks beginning on monday (Notice that in the dataframe, above, week 2 appears on day 8 which is a Monday as indicated in the wkday column).
+
+- Calculate the daily returns. Since `quantmod` returns an object that has column names with the ticker in the names (e.g., SPY.Close), it would be difficult to change the ticker in the initial `getSymbols` call to see the returns for, say, Disney, since you would then need to go into mutate and change the column names there, each time, as well. Therefore, reference the closing price columns by position when calculating the returns column. The dots you see stand in for the dataframe, itself, and we use the double bracket indexing we use for lists and vectors to get the fifth column. 
+
+- In order to compare the difference in price from one date to another,use `lag`.  `lag` shifts the column down by one position so that the value originally in position `n` is now found in position `n + 1`. The returns column calculates the difference between SPY.Closing on day `n + 1` and `SPY.Closing` on day `n`, then divides this by the price on day `n`.
+
+# Calendar Plot
+
+Once those columns have been created, we will select and pipe them to ggplot. The wk column, representing weeks of the year, is passed to the x axis, while the wkday column, representing the day of the week, is passed to the y axis. We set fill=returns since we are coloring an area by this variable. geom_tile is added, with color='black' since we want the borders of each square to be black (remember that fill colors in areas such as bars, and color adds color to single dimension objects such as dots and lines). We then add geom_text with label=day in order to have the day of the month overlayed on each square that has a value (return) associated with it.
+
+- `scale_fill_distiller` determines how the numbers in the returns column map onto colors we will use for the squares you see. We use a `scale_fill_*` function for this because we specified earlier in our` ggplot()` call that we wanted to map a variable to fill (returns). `scale_fill_distiller` will allow us to specify exactly how our returns column will be represented in color.
+
+- Values will always range from negative to positive, and the full range is of interest to us. Therefore, we will use a diverging color palette. `type = "div"` tells `scale_fill_distiller` that we want a color palette that ranges from a dark shade of one color to a dark shade of another - in other words, a diverging palette. As you can see in the calendar heatmap, darker blue represents greater positive daily returns, whereas darker red represents greater negative returns.
+
+- `palette = 7` is the red to blue palette, which is appropriate here since negative returns are typically seen as bad, and positive good (a red to green may have been more appropriate considering this)
+
+-` na = 'white'` tells `scale_fill_distiller` to fill with white any days with NA values. This will be the first value (January 2) since an NA was introduced when we calculated returns (the first date has no prior date to substract the price from).
+
+- `limits = c(-.055, .055)` sets the boundaries of the color range. Since all values of returns fall within this range, and we want 0 to be white.
+
+- `labels = percent` uses the percent function from the scales package to convert the returns to percent format on the legend.
+
+- `direction = 1` indicates the direction of the colors. `direction = -1` would run from blue to red
+`facet_grid`
+
+- `scales = "free"` allows each month section to show only the week numbers that are present for that month, and not the full 52 of the year repeated for each month.
+
+
+```{r}
+# stock_xts <- getSymbols("SPY", auto.assign = FALSE, from="2018-01-01")
+# stock_df <- fortify.zoo(stock_xts)
+
+stock_df %>%
+  mutate(year = year(Index),
+         month = month(Index, label = TRUE),
+         wkday = fct_relevel(wday(Index, label=TRUE),
+                             c("Mon", "Tue","Wed","Thu","Fri","Sat","Sun")),
+         day = day(Index),
+         wk = format(Index, "%W"),
+         returns = (.[[5]] - lag(.[[5]]))/lag(.[[5]])) %>%
+  select(year, month, wkday, day, wk, returns) %>% 
+    ggplot(aes(wk, wkday, fill=returns)) +
+      geom_tile(color='black') +
+      geom_text(aes(label=day), size=3) + 
+      labs(x='', 
+           y='',
+           title="SPY") +
+      scale_fill_distiller(type="div" 
+                           ,palette=7
+                           ,na.value = 'white' 
+                           ,limits=c(-.055, .055)
+                           ,labels = percent
+                           ,direction=1) +
+      theme(panel.background = element_blank(),
+            axis.ticks = element_blank(),
+            axis.text.x = element_blank(),
+            strip.background = element_rect("grey92")) +
+      facet_grid(year~month, scales="free", space="free")
+```
+
+# Reference:
+https://ryanplant.netlify.com/post/calendar-heatmaps-in-ggplot/
