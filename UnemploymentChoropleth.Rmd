@@ -1,0 +1,25 @@
+---
+title: "Plotting Unemployment Choropleth"
+output: html_document
+---
+```{r}
+library(rUnemploymentData)
+data(df_state_unemployment)
+
+boxplot(df_state_unemployment[, 2:ncol(df_state_unemployment)],
+    main = "US State Unemployment Rates",
+    xlab = "Year",
+    ylab = "Percent Unemployment")
+
+
+library(choroplethr)
+library(choroplethrMaps)
+
+df_state_unemployment$value = (df_state_unemployment$"2009" - df_state_unemployment$"2008") / df_state_unemployment$"2008" * 100
+
+state_choropleth(df_state_unemployment, 
+    title      = "Percent Change in US State Unemploymentn2008-2009",
+    legend     = "% Change",
+    num_colors = 1)
+
+```

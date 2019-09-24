@@ -1,0 +1,273 @@
+---
+title: "Pirate Plots - Better Than Barplots"
+output: html_document
+---
+ http://nathanieldphillips.com/2016/04/pirateplot-2-0-the-rdi-plotting-choice-of-r-pirates/
+
+Plain vanilla barplots are as uninformative (and ugly) as they are popular. And boy, are they popular. From the floors of congress, to our latest scientific articles, barplots surround us. The reason why barplots are so popular is because they are so simple and easy to understand. However, that simplicity also carries costs — namely, barplots can mask important patters in data like multiple modes and skewness.
+
+Instead of barplots, we should be using RDI plots, where RDI stands for Raw (data), Description and Inference. Specifically, an RDI plot should present complete raw data — including smoothed densities, descriptive statistics — like means and medians, and Inferential statistics — like a Bayesian 95% Highest Density Interval (HDI). The R community already has access to many great examples of plots that come close to the RDI trifecta. For example, beanplots, created by the beanplot() function, show complete raw data and smoothed distributions (Kampstra, 2008).
+
+Today, the R community has access to a new RDI plot — the pirate plot. I discovered the original code underlying the pirate plot during a late night swim on the Bodensee in Konstanz Germany. The pirate plot function was written in an archaic German pirate dialect on an old beer bottle and is unfortunately unusable. However, I have taken the time to painstakingly translate the original pirate code into a new R function called pirateplot(). The latest version (now 2.0) of the translations are stored in the yarrr package on Github at (www.github.com/ndphillips/yarrr). To install the package and access the piratepal() function within R, run the following code:
+```{r}
+#install.packages("devtools")
+library("devtools")
+#install_github("ndphillips/yarrr")
+``` 
+Once you’ve installed the yarrr package, you need to load the yarrr package with the library command
+```{r}
+#Make sure you have installed JAGS-4.x.y.exe (for any x >=0, y>=0) from
+#http://www.sourceforge.net/projects/mcmc-jags/files
+library("yarrr")
+``` 
+
+Now you’re ready to make some pirate plots! Let’s create a pirate plot from the pirates dataset in the yarrr package. This dataset contains results from a survey of several pirates at the Bodensee in Konstanz. We’ll create a pirateplot showing the distribution of ages of pirates based on their favorite pirate:
+```{r} 
+pirateplot(formula = age ~ favorite.pirate,
+           data = pirates,
+           xlab = "Favorite Pirate",
+           ylab = "Age",
+           main = "My First Pirate Plot!")
+```
+
+The arguments for the pirateplot are very similar to that of other plotting functions like barplot() and beanplot(). They key arguments are formula, where you specify one (or two) categorical variable(s) for the x-axis, and and numerical variable for the y-axis.
+
+In addition to the data arguments, there are arguments that dictate the opacity of the 5 key elements of a pirate plot: bar.o, The opacity of the bars. bean.o, the opacity of the beans, point.o, the opacity of the points, and line.o, the opacity of the average lines at the top of the bars. Finally, hdi.o controls the opacity of the 95% Bayesian Highest Density Interval (HDI). The HDIs are calculated using the BEST package (Kruschke, 2013). Because calculating HDIs can be time-consuming, they are turned off by default (i.e.; hdi.o = 0). In the next plots, I’ll turn them on so you can see them.
+
+The pirateplot() function has built-in color arguments. You can control the overall color palette of the plot with pal, and the color of the plot background with back.col. Let’s change a few of these arguments. I’ll also include the 95% Highest Density Intervals (HDIs) by setting hdi.o = .7.
+```{r} 
+pirateplot(formula = age ~ favorite.pirate,
+           data = pirates,
+           xlab = "Favorite Pirate",
+           ylab = "Age",
+           main = "Black and White Pirate Plot",
+           pal = "black",
+           hdi.o = .7,
+           line.o = 1,
+           bar.o = .1,
+           bean.o = .1,
+           point.o = .1,
+           point.pch = 16,
+           back.col = gray(.97))
+```
+
+As you can see, the entire plot is now grayscale, and different elements of the plot have been emphasised by changing the opacity arguments. For example, now that we’ve set the opacity of the HDI to .8 (the default is 0), we can see the Bayesian 95% Highest Density Interval for the mean of each group.
+
+Hopefully it’s clear how much better RDI plots are than standard bar plots. Now, in addition to just seeing one piece of information (the mean) of each group, we can see all the raw data, a smoothed density curve of the data (helpful for detecting multiple modes and skewness), as well as Bayesian inference.
+
+Oh, and just for comparison purposes, we can create a standard barplot within the pirateplot() function by adjusting the opacity arguments:
+```{r} 
+pirateplot(formula = age ~ favorite.pirate,
+           data = pirates,
+           xlab = "Favorite Pirate",
+           ylab = "Age",
+           main = "Black and White Pirate Plot",
+           pal = "black",
+           hdi.o = 0,
+           line.o = 0,
+           bar.o = 1,
+           bean.o = 0,
+           point.o = 0)
+```
+
+Now how awful does that barplot look in comparison to the far superior pirate plot?!
+
+You can also include multiple independent variables as arguments to the pirateplot() function. For example, I can plot the pirates’ beard lengths separated by sex and the college pirate went to. For this plot, I’ll use the southpark palette and emphasize the HDI by turning its opacity up to .6
+```{r} 
+pirateplot(formula = beard.length ~ sex + college,
+           data = pirates,
+           main = "Beard lengths",
+           pal = "southpark",
+           xlab = "",
+           ylab = "Beard Length",
+           point.pch = 16,
+           point.o = .2,
+           hdi.o = .6,
+           bar.o = .1,
+           line.o = .5)
+```
+
+As you can see, it’s very easy to customise the look and focus of your pirate plot. Here are 6 different plots of the weights of chickens given one of 4 diets (from the ChickWeight dataframe in R). You can see the code for each by accessing the help menu for the pirateplot() function within R.
+
+Here are more examples fron the help file for pirateplot()
+
+# Pirateplots of the ChickWeight dataframe
+```{r}
+# Plot 1: Theme 1
+pirateplot(formula = weight ~ Diet,
+          data = ChickWeight,
+          main = "Theme 1",
+          theme.o = 1
+)
+# Plot 2: Theme 1 + grayscale
+pirateplot(formula = weight ~ Diet,
+          data = ChickWeight,
+          main = "Theme 1 + grayscale",
+          theme.o = 1,
+          pal = "black"
+)
+# Plot 3: Theme 2
+pirateplot(formula = weight ~ Diet,
+          data = ChickWeight,
+          main = "Theme 2",
+          theme.o = 2
+)
+# Plot 4: Theme 2 + grayscale
+pirateplot(formula = weight ~ Diet,
+          data = ChickWeight,
+          main = "Theme 2 + grayscale",
+          pal = "black",
+          theme.o = 2,
+          point.o = .2,
+          point.pch = 16
+)
+# Plot 5: Theme 3
+pirateplot(formula = weight ~ Diet,
+          data = ChickWeight,
+          main = "Theme 3\nHDIs take time to calculate...",
+          theme.o = 3
+)
+# Plot 6: Theme 3 + white on black
+pirateplot(formula = weight ~ Diet,
+          data = ChickWeight,
+          main = "Theme 3 + white on black\nHDIs take time to calculate...",
+          pal = "white",
+          theme.o = 3,
+          point.pch = 16,
+          back.col = gray(.2)
+)
+# Plot 7: Theme 0 - Fully customised
+pirateplot(formula = weight ~ Diet,
+          data = ChickWeight,
+          main = "Theme 0\nFully customized",
+          pal = "google",
+          point.o = .2,
+          line.o = 1,
+          theme.o = 0,
+          line.lwd = 10,
+          point.pch = 16,
+          point.cex = 1.5,
+          jitter.val = .1
+)
+# Plot 8: Theme 0\nFully customised
+pirateplot(formula = weight ~ Diet,
+          data = ChickWeight,
+          main = "Theme 0\nFully customized",
+          pal = "info2",
+          point.o = .03,
+          line.o = 0,
+          bean.o = 1,
+          theme.o = 0,
+          back.col = transparent("steelblue4", .5),
+          line.lwd = 10,
+          point.pch = 16,
+          point.cex = 3,
+          jitter.val = .00
+)
+
+##Updated April 8, 2016
+```
+See http://www.r-bloggers.com/the-new-and-improved-pirateplot-now-with-themes/?utm_source=feedburner&utm_medium=email&utm_campaign=Feed%3A+RBloggers+%28R+bloggers%29
+
+Let’s go over the changes! To use the latest version of the pirateplot() function, be sure to install the latest version of the yarrr package:
+```{r}
+# install.packages("devtools") # Only if you don't have the devtools library already installed
+library("devtools")
+install_github("ndphillips/yarrr")
+```
+Once you’ve installed the latest version, load the package with library()
+```{r}
+library("yarrr")
+```
+
+Now you’re ready to make some pirate plots! Here are the major updates to the function:
+
+###Opacity Themes
+
+The five critical aspects of a pirate plot are the bars, beans, points, (average) lines, and hdis. You can adjust the opacity of each of these elements with opacity arguments — such as bars.o, beans.o (etc.).
+
+The biggest update to pirateplot() is the addition of opacity themes which are designated by a new argument called theme.o. The input to this argument defines an opacity theme across all five elements. Themes 1, 2, and 3 create specific opacity values for each of the elements, while Theme 0 sets all opacities to 0. Thankfully, the themes just set default values for the individual element opacities — you can still override the opacities of any specific object within a theme by including an object specific opacity value.
+
+Here are examples of the three different themes applied to the ChickWeight dataset:
+
+####Theme 1
+
+Theme 1 emphasises the bar with light points and beans (I’ll use the appletv palette for this one)
+```{r}
+pirateplot(formula = weight ~ Diet,
+           data = ChickWeight,
+           main = "Theme 1nappletv palette",
+           theme.o = 1,
+           pal = "appletv")
+```
+
+####Theme 2
+
+Theme 2 emphasises the points and beans (using the southpark palette)
+```{R}
+pirateplot(formula = weight ~ Diet,
+           data = ChickWeight,
+           main = "Theme 2nsouthpark palette",
+           theme.o = 2,
+           pal = "southpark")
+```
+
+####Theme 3
+
+Theme 3 Emphases the 95% Highest Density Intervals (HDIs). Keep in mind that calculating HDIs can take a few seconds for each bean… Here I’ll use the Basel palette.
+```{R}
+pirateplot(formula = weight ~ Diet,
+           data = ChickWeight,
+           main = "Theme 3nbasel palette",
+           theme.o = 3,
+           pal = "basel")
+```
+
+####Theme 0
+
+In Theme 0, all opacities are set to 0 by default, so you can just individually specify the opacity of each element. In this example, I’ll turn the lines on full-blast, and turn the points on slighly. I’ll also increase the amount of jittering and size of the points. I’ll also use the google palette.
+```{R}
+pirateplot(formula = weight ~ Diet,
+           data = ChickWeight,
+           main = "Theme 0ngoogle palette",
+           pal = "google",
+           point.o = .2,
+           line.o = 1,
+           theme.o = 0,
+           line.lwd = 10,
+           point.pch = 16,
+           point.cex = 1.5,
+           jitter.val = .1)
+```
+
+Of course, you can still change the colors of the plotting elements with the par argument, and the background using the back.col argument. Here’s an x-ray version of Theme 3
+```{R}
+pirateplot(formula = weight ~ Diet,
+           data = ChickWeight,
+           main = "Theme 3nlight color with black background",
+           pal = "white",
+           theme.o = 3,
+           point.pch = 16,
+           back.col = gray(.2))
+```
+
+####Gridlines
+
+You can now include gridlines in your plot with the gl.col argument. Just specify the color of the lines and the function will put them in reasonable places. The following plot also shows how pirateplot() handles two independent variables:
+```{R}
+pirateplot(formula = weight ~ Diet + Time,
+           data = subset(ChickWeight, Time < 10),
+           theme.o = 2,
+           pal = "basel",
+           point.pch = 16,
+           gl.col = gray(.8),
+           main = "Two IVsnWith gridlines")
+```
+
+###Other minor changes
+
+I’ve also made the following smaller changes
+
+- The function no longer automatically sorts the levels of the IV. It will plot levels of the IV(s) in the order the are found in the original dataframe.
+- You can now manually change the color of the bar borders with the bar.border.col argument.
+

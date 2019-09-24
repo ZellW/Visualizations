@@ -1,0 +1,57 @@
+---
+title: "data.tree 0.3 ‘Apple Tree’ on CRAN - Now with tree plot!"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+See http://ipub.com/data-tree-0-3-apple-on-cran/
+
+In Celtic mythology, the apple tree is a symbol for fruitfulness. May data.tree blossom and fructify … and generate that perfect tree plot for us!
+
+The hottest feature of the new release are tree plots: Thanks to the DiagrammeR package, we can now generate beautiful plots in html format. You can include them in RMarkdown documents, web pages, shiny apps, and more. And they may contain interactive tooltips and more.
+
+In case you don’t know what data.tree is: It’s a generic data.structure in R, letting you model and work with hierarchic data with ease. There are two vignettes, walking you through the possibilities offered by the package:
+
+[data.tree introduction vignette](http://ipub.com/wp-content/uploads/2016/02/data.tree_.html)
+
+[sample applications using data.tree](http://ipub.com/wp-content/uploads/2016/02/applications.html)
+
+data.tree is useful when converting hierarchic data structures from and to R (e.g. JSON, YAML), for recursive programming algorithms, and much more. For example, the AHP package has been developed with data.tree. Check out the [AHP sample application](http://ipub.com/apps/ahp/) to learn more.
+
+To install the package, simply type the following in R:
+```{r}
+#install.packages(data.tree)
+```
+
+To get started with tree data structures, you may want to look at acme, the package sample data.tree structure.
+
+This will print the tree to the console:
+```{r warning=FALSE}
+library(data.tree)
+data(acme)
+(data)
+print(acme, "p", "cost", expectedCost = function(node) node$p * node$cost)
+```
+
+To generate a (non-styled) tree plot of the acme sample data, do the following:
+```{r}
+plot(acme)
+```
+
+With a few directives, we can style this to our needs:
+```{r}
+SetEdgeStyle(acme, arrowhead = "vee", color = "grey35", penwidth = 2)
+SetNodeStyle(acme, style = "filled,rounded", shape = "box", fillcolor = "GreenYellow", fontname = "helvetica")
+SetNodeStyle(acme$IT, fillcolor = "LightBlue", penwidth = "5px")
+SetNodeStyle(acme$Accounting, inherit = FALSE, fillcolor = "Thistle", fontcolor = "Firebrick")
+plot(acme)
+```
+
+Styling is very flexible, yet it takes advantage of the fact that data.tree structures are strictly hierarchical. For example, styling attributes are inherited from parents to children (except inheritance is explicitly set to FALSE).
+
+The release contains also a few fixes and other improvements. See here for the release notes. And if you have questions or want to report a bug, then please do so directly on github. And if you want to get informed about solved issues, new releases, etc., please star the project on github.
+
+So, to frame this post appropriately with yet another apple analogy, let’s close with the following noticeable fact: In the Ulster Cycle, the soul of Cú Roí was confined in an apple that lay in the stomach of a salmon which appeared once every seven years. Not that I know what the Ulster Cycle is, or who in the world Cú Roí was. But it makes a nice story, as we all do hope that the next data.tree release will appear earlier than that!

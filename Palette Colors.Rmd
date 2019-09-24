@@ -1,0 +1,145 @@
+---
+title: "Palette Colors"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+###Color Palettes
+```{r message=FALSE, warning=FALSE}
+# 1.Define R Color Data ----
+# RGB codes
+color.rgb <- t(col2rgb(colors()))
+
+# Hexadecimal codes
+color.hex <- rgb(color.rgb[,1], color.rgb[,2], color.rgb[,3], maxColorValue = 255)
+# Text highlighting
+color.text <- ifelse(apply(color.rgb, 1, mean) > 127, "black", "white")
+# Consolidate
+color.df <- data.frame(name = colors(),
+                       red = color.rgb[, "red"],
+                       green = color.rgb[, "green"],
+                       blue = color.rgb[, "blue"],
+                       hex = color.hex,
+                       text = color.text)
+
+# 2.Plot R Colors By Name ----
+# configure graphical device
+n.col <- 11
+n.row <- 60
+par(pin = c(11.692, 6.267), mai=c(0.2, 0.2, 0.2, 0.2))
+#mai numerical vector indicating margin size c(bottom, left, top, right) in inches  
+#pin plot dimensions (width, height) in inches  
+#
+# create plot
+plot(c(0, n.col), c(0, n.row), 
+     type = "n", 
+     bty = "n", 
+     ylab = "", 
+     xlab = "", 
+     axes = FALSE)
+title("R Colors By Name")
+
+for(i in 1:n.col){
+     color.count <- (i-1) * n.row
+     color.mod <- length(colors()) - color.count
+     y.val <- ifelse(color.mod < n.row, n.row - color.mod + 1, 1)
+     color.names <- as(color.df[color.count + 1:n.row, "name"], "character")
+     rect(i - 1, y.val - 0.5, i, n.row:y.val + 0.5, border = "black", col = color.names)
+     text.color <- as(color.df[color.count + 1:n.row, "text"], "character")
+     text(i-0.5, n.row:y.val, labels = color.names, cex = 0.5, col = text.color)
+}
+
+# 3.Plot R Colors By Hex Code ----
+# create plot
+plot(c(0, n.col), c(0, n.row), 
+     type = "n", 
+     bty = "n", 
+     ylab = "", 
+     xlab = "", 
+     axes = FALSE)
+title("R Colors By Hex Code")
+
+for(i in 1:n.col){
+     color.count <- (i-1) * n.row
+     color.mod <- length(colors()) - color.count
+     y.val <- ifelse(color.mod < n.row, n.row-color.mod + 1, 1)
+     color.names <- as(color.df[color.count + 1:n.row, "hex"], "character")
+     rect(i - 1, y.val - 0.5, i, n.row:y.val + 0.5, border = "black", col = color.names)
+     text.color <- as(color.df[color.count + 1:n.row, "text"], "character")
+     text(i-0.5, n.row:y.val, labels = color.names, cex = 0.5, col = text.color)
+}
+```
+
+###Alternative Code for Color Palettes
+
+The R function below, SetTextContrastColor, gives a good text color for a given background color name: 
+```{r}
+SetTextContrastColor <- function(color)
+ {
+   ifelse( mean(col2rgb(color)) > 127, "black", "white")
+ }
+
+# Define this array of text contrast colors that correponds to each
+ # member of the colors() array.
+ TextContrastColor <- unlist( lapply(colors(), SetTextContrastColor) ) 
+```
+```{r}
+# 1a. Plot matrix of R colors, in index order, 25 per row.
+ # This example plots each row of rectangles one at a time.
+ colCount <- 25 # number per row
+ rowCount <- 27
+
+plot( c(1,colCount), c(0,rowCount), type="n", ylab="", xlab="",
+   axes=FALSE, ylim=c(rowCount,0))
+ title("R colors") 
+
+for (j in 0:(rowCount-1))
+ {
+   base <- j*colCount
+   remaining <- length(colors()) - base
+   RowSize <- ifelse(remaining < colCount, remaining, colCount)
+   rect((1:RowSize)-0.5,j-0.5, (1:RowSize)+0.5,j+0.5,
+     border="black",
+     col=colors()[base + (1:RowSize)])
+   text((1:RowSize), j, paste(base + (1:RowSize)), cex=0.7,
+     col=TextContrastColor[base + (1:RowSize)])
+ } 
+
+```
+
+Alphabetical order is not necessarily a good way to find similar colors.  The RGB values of each of the colors() was converted to hue-saturation-value (HSV) and then sorted by HSV.  This approach groups colors of the same "hue" together a bit better.  Here's the code and graphic produced: 
+
+
+###Plot matrix of R colors, in "hue" order, 25 per row.
+```{r}
+ # This example plots each rectangle one at a time.
+ RGBColors <- col2rgb(colors()[1:length(colors())])
+ HSVColors <- rgb2hsv( RGBColors[1,], RGBColors[2,], RGBColors[3,],
+              maxColorValue=255)
+ HueOrder <- order( HSVColors[1,], HSVColors[2,], HSVColors[3,] )
+
+plot(0, type="n", ylab="", xlab="",
+ axes=FALSE, ylim=c(rowCount,0), xlim=c(1,colCount))
+
+title("R colors -- Sorted by Hue, Saturation, Value")
+
+for (j in 0:(rowCount-1))
+ {
+   for (i in 1:colCount)
+   {
+    k <- j*colCount + i
+    if (k <= length(colors()))
+    {
+     rect(i-0.5,j-0.5, i+0.5,j+0.5, border="black", col=colors()[ HueOrder[k] ])
+     text(i,j, paste(HueOrder[k]), cex=0.7, col=TextContrastColor[ HueOrder[k] ])
+    }
+   }
+ } 
+```
+```{r echo=FALSE}
+# reset graphical device
+dev.off()
+```

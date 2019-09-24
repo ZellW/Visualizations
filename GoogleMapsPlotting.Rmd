@@ -1,0 +1,69 @@
+http://rbyexamples.blogspot.com/2015/06/north-carolina-sids-data.html
+
+##Plotting geographical incidence of a disease 
+
+Can we use R to plot maps of the incidence of a disease? Short answer: Yes, easily.
+
+Let's take a look at an example.
+
+According to the Mayo Clinic, sudden infant death syndrome (SIDS) is the unexplained death, usually during sleep, of a seemingly healthy baby less than twelve months old.
+
+Medical researchers have produced a dataset of SIDS incidence in North Carolina. This link gives lots of information. (However, you aren't required to read it.)
+
+First off, let's install and load the required packages (again, you don't need to install them if you've done so previously):
+```{r}
+ install.packages('rgeos')
+ install.packages('maptools')
+ install.packages('plotGoogleMaps')
+ install.packages('spacetime')
+ install.packages('rgdal')
+
+ library(rgdal)
+ library(rgeos)
+ library(maptools)
+ library(RColorBrewer)
+ library(spacetime)
+ library(plotGoogleMaps)
+```
+
+Next, let's load the North Carolina SIDS dataset:
+```{r}
+nc <- readShapeSpatial(system.file("shapes/sids.shp",package="maptools")[1], proj4string=CRS("+proj=longlat +datum=NAD27"))
+```
+
+readShapeSpatial is a function which (unsurprisingly) reads shape files, and outputs Spatial*DataFrame objects. The first argument entered specifies the file to be read, and the second argument specifies the output.
+
+You may be wondering, what is a Spatial*DataFrame object? If this documentation isn't particularly enlightening, there are easy ways to find out more:
+
+nc outputs the following:
+ 
+class       : SpatialPolygonsDataFrame 
+features    : 100 
+extent      : -84.32385, -75.45698, 33.88199, 36.58965  (xmin, xmax, ymin, ymax)
+coord. ref. : +proj=longlat +datum=NAD27 +ellps=clrk66 +nadgrids=@conus,@alaska,@ntv2_0.gsb,@ntv1_can.dat 
+variables   : 14
+names       :  AREA, PERIMETER, CNTY_, CNTY_ID,     NAME,  FIPS, FIPSNO, CRESS_ID, BIR74, SID74, NWBIR74, BIR79, SID79, NWBIR79 
+min values  : 0.042,     0.999,  1825,    1825, Alamance, 37001,  37001,        1,   248,     0,       1,   319,     0,       3 
+max values  : 0.241,     3.640,  2241,    2241,   Yancey, 37199,  37199,      100, 21588,    44,    8027, 30757,    57,   11631 
+
+As you can tell, nc contains both geographical information (see the third line) as well as information of the incidence of SIDS in each North Carolina county (see the line containing names)
+
+Variables starting with SID refer to the incidence of sudden infant death syndrome, while BIR refer to the number of babies born, and NWBIR refers to non-white births.
+
+If you're curious, find out even more through:
+```{r}
+summary(nc)
+```
+Next, let's plot the SIDS data onto Google Maps. Notice the first argument specifies the SIDS dataset, while the second argument specifies the column 
+```{r}
+plotGoogleMaps(nc, zcol="SID74")
+```
+
+If you are doing the exercise in R, you can click on each county to find out more information.
+
+For good measure, let's try a different version of Google Maps:
+```{r}
+ plotGoogleMaps(nc, zcol="SID74" , mapTypeId='road',colPalette= brewer.pal(7,"Reds"), strokeColor="white")
+```
+
+This example is generalizable: one can easily imagine plotting the incidence of poverty rate, telephone penetration, voting behavior, and so on.

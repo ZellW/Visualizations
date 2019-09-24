@@ -1,0 +1,197 @@
+---
+title: "Human Capital in the AI Age"
+output: html_document
+---
+
+
+Data science, artificial intelligence, automation, and other advanced technologies are reshaping the world.
+We're starting to see glimpses of it, for example the rapid emergence of self driving cars. Moreover, 
+the changes brought about by technology will likely become more frequent and more dramatic in the next few years.
+ 
+In fact, two MIT economist, Erik Brynjolfsson and Andrew McAfee, think that the emergence of AI and data 
+driven technologies may be one of the most important events in all of human history. 
+ 
+## Risk and opportunity in the age of AI
+ 
+They suggest that AI and automation will dramatically increase productivity and human development. 
+In essence, AI, machine learning, and data-driven technology will free us from our cognitive limitations 
+much like the engine freed us from our physical limitations. This will in turn lead to large gains 
+in productivity.
+ 
+But while AI and data-driven tech will likely increase productivity, they are also likely to lead to 
+high levels of unemployment. As software and technology become more intelligent, they will replace people 
+who don't have the right skills.
+ 
+## A critical factor for success: human capital
+ 
+How can someone succeed in such an era?
+ 
+Brynjolfsson and McAfee point out that one of the keys to success in the age of data, AI, and automation will be human capital.
+ 
+As technology increasingly substitutes for people, one of the keys to success will be cutting-edge knowledge, 
+judgement (particularly in complex domains)and creativity.
+ 
+## Mapping Human Capital
+# 
+In thinking about this, I decided to map which countries have the highest levels of human capital, 
+as measured by the World Economic Forum.
+ 
+While the WEF's Human Capital Index is not a perfect index of cutting edge skill, it does provide a high-level 
+view of the countries that may be better prepared for a changing, high-tech world.
+ 
+One thing in particular that I'll note, is that this map effectively shows averages of national performance. 
+Having said that, talent and innovation are known to be highly uneven geographically. There are "spikes." 
+So even though this map shows countries' average performance, we'd likely see an even different story 
+if we looked at cities (or even zip codes).
+```{r warning=FALSE, message=FALSE}
+#==============
+# LOAD PACKAGES
+#==============
+library(tidyverse)
+library(stringr)
+library(readr)
+library(rvest)
+library(viridis)
+
+#============
+# SCRAPE DATA
+#============
+
+#-----------------------
+# ESTABLISH URL LOCATION
+#-----------------------
+html.human_capital <- read_html("http://reports.weforum.org/human-capital-report-2016/rankings/")
+
+#-------------------------------
+# SCRAPE: Extract table from URL
+#-------------------------------
+df.human_capital <- html.human_capital %>% html_node("table") %>% html_table()
+
+# inspect
+glimpse(df.human_capital)
+
+#========================
+# RENAME VARIABLES
+# - convert to lower case
+#========================
+
+df.human_capital <- df.human_capital %>% rename(rank = `Overall Rank`, country_nm = Economy
+                    ,human_cap_score = `Overall Score`)
+
+# INSPECT
+glimpse(df.human_capital)
+
+#==============
+# GET WORLD MAP
+#==============
+
+map.world <- map_data("world")
+
+# INSPECT
+glimpse(map.world)
+
+#===================================================================
+# RECODE COUNTRY NAMES
+#  some of the countries in the data frame df.human_capital don't 
+#  exactly match the names in map.world.
+#  This prohibits a proper join.  
+#  We're going to hard-code (i.e. recode) these values to make sure
+#  that the join works properly
+#===================================================================
+
+#------------------------------------------
+# GET LIST OF COUNTRIES IN df.human_capital
+#------------------------------------------
+df.hcap_countries <- df.human_capital %>% select(country_nm)
+
+#-----------------------------------
+# GET LIST OF COUNTRIES IN map.world
+#-----------------------------------
+df.map_countries <- map.world %>% select(region) %>% group_by(region) %>% summarise(match = 1) 
+
+#-----------------------------
+# LOOK FOR MATCH or NO-MATCH
+#  - we'll use a join for this
+#    and inspect the output
+#-----------------------------
+
+df.check_match <- left_join(df.hcap_countries, df.map_countries, by = c('country_nm' = 'region'))
+
+df.check_match %>% filter(is.na(match))
+
+#------------------------------
+# THESE ARE THE COUNTRIES THAT
+# DO NOT MATCH:
+#             country_nm  match
+# 1   Russian Federation     NA
+# 2       United Kingdom     NA
+# 3        United States     NA
+# 4           Korea Rep.     NA
+# 5      Kyrgyz Republic     NA
+# 6      Slovak Republic     NA
+# 7        Macedonia FYR     NA
+# 8    Iran Islamic Rep.     NA
+# 9  Trinidad and Tobago     NA
+# 10             Lao PDR     NA
+# 11       CÙte d'Ivoire     NA
+#------------------------------
+
+#---------------------------------------------------------
+# RECODE COUNTRY NAMES
+#  - now that we have the names from df.human_capital that
+#    don't match map.world, we can recode them
+#  - to get the "new" names that we need to use,
+#    inspect the names in df.map_countries
+#---------------------------------------------------------
+df.human_capital[123,2] <- "Ivory Coast"
+df.human_capital$country_nm <- recode(df.human_capital$country_nm
+                                      ,'Russian Federation'    = 'Russia'
+                                      ,'United Kingdom'        = 'UK'
+                                      ,'United States'         = 'USA'
+                                      ,'Korea, Rep.'           = 'South Korea'
+                                      ,'Kyrgyz Republic'       = 'Kyrgyzstan'
+                                      ,'Slovak Republic'       = 'Slovakia'
+                                      ,'Macedonia, FYR'        = 'Macedonia'
+                                      ,'Iran, Islamic Rep.'    = 'Iran'
+                                      ,'Trinidad and Tobago'   = 'Trinidad'
+                                      ,'Lao PDR'               = 'Laos'
+)
+
+#====================================================
+# JOIN HUMAN CAPITAL DATA TO MAP
+# - now we can join the human capital data to the map
+#====================================================
+
+map.world <- left_join(map.world, df.human_capital, by = c('region' = 'country_nm'))
+
+glimpse(map.world)
+
+#=====================================
+# PLOT: BASIC MAP
+# - this is a simple first iteration
+#=====================================
+ggplot(data = map.world, aes(x = long, y = lat, group = group)) + geom_polygon(aes(fill = human_cap_score)) 
+
+#=======================================
+# PLOT FINAL MAP
+# - this is the finalized version after 
+#   much iteration
+#=======================================
+
+ggplot(data = map.world, aes(x = long, y = lat, group = group)) +
+     geom_polygon(aes(fill = human_cap_score)) +
+     scale_fill_viridis(name = "Human Capital\nIndex") +
+     labs(title = "Human Capital Index, by country"
+          ,subtitle = "source: World Economic Forum, 2016\n reports.weforum.org/human-capital-report-2016/") +
+     theme(panel.background = element_rect(fill = "#3E3E3E")
+           ,plot.background = element_rect(fill = "#3E3E3E")
+           ,legend.background = element_blank()
+           ,axis.title = element_blank()
+           ,axis.text = element_blank()
+           ,axis.ticks = element_blank()
+           ,panel.grid = element_blank()
+           ,text = element_text(family = "Gill Sans", color = "#DDDDDD")
+           ,plot.title = element_text(size = 32)
+           ,legend.position = c(.18,.375)
+     ) 
+```

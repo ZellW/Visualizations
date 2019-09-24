@@ -1,0 +1,27 @@
+The contour() function produces a contour plot in order to represent three-dimensional data; it is like a topographical map. It takes three arguments:
+
+1. A vector of the x values (the first dimension),
+2. A vector of the y values (the second dimension), and
+3. A matrix whose elements correspond to the z value (the third dimension) for each pair of (x,y) coordinates.
+
+As with the plot() function, there are many other inputs that can be used to fine-tune the output of the contour() function. To learn more about these, take a look at the help file by typing ?contour.
+
+```{r}
+
+x=seq(-pi ,pi ,length =50)
+y=x
+f=outer(x,y,function (x,y)cos(y)/(1+x^2))
+contour (x,y,f)
+contour (x,y,f,nlevels =45, add=T)
+fa=(f-t(f))/2
+contour (x,y,fa,nlevels =15)
+```
+The image() function works the same way as contour(), except that it produces a color-coded plot whose colors depend on the z value. This is known as a heatmap, and is sometimes used to plot temperature in weather forecasts. Alternatively, persp() can be used to produce a three-dimensional plot. The arguments theta and phi control the angles at which the plot is viewed.
+```{r}
+image(x,y,fa)
+persp(x,y,fa)
+persp(x,y,fa ,theta =30)
+persp(x,y,fa ,theta =30, phi =20)
+persp(x,y,fa ,theta =30, phi =70)
+persp(x,y,fa ,theta =30, phi =40)
+```

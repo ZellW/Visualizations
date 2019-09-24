@@ -1,0 +1,145 @@
+---
+title: "Mapping Crime"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+See 
+http://www.sharpsightlabs.com/mapping-seattle-crime/
+
+###First, we’ll start by loading the data.
+
+Note that I already “cleaned” this dataset (mostly removing extraneous variables, data prior to 2010, etc,).
+```{r message=FALSE, warning=FALSE}
+library(ggmap)
+library(dplyr)
+library(ggplot2)
+
+#########################
+# GET SEATTLE CRIME DATA
+#########################
+
+download.file("http://www.sharpsightlabs.com/wp-content/uploads/2015/01/seattle_crime_2010_to_2014_REDUCED.txt.zip", destfile="seattle_crime_2010_to_2014_REDUCED.txt.zip")
+
+#------------------------------
+# Unzip the SF crime data file
+#------------------------------
+unzip("seattle_crime_2010_to_2014_REDUCED.txt.zip")
+
+#------------------------------------
+# Read crime data into an R dataframe
+#------------------------------------
+df.seattle_crime <- read.csv("seattle_crime_2010_to_2014_REDUCED.txt")
+```
+
+###Get map of Seattle using ggmap package
+
+qmap() is a function from the ggmap package. Basically, it pings Google Maps and creates a map that you can use for a geospatial context layer. (It can also retrieve related maps made by Stamen, CloudMade, or OpenStreetMap.)
+
+```{r warning=FALSE, message=FALSE}
+################
+# SEATTLE GGMAP
+################
+
+map.seattle_city <- qmap("seattle", zoom = 11, source="stamen", maptype="toner",darken = c(.3,"#BBBBBB"))
+map.seattle_city
+```
+
+Here, we’re using qmap() as follows:
+
+We’re calling it with “seattle” as the first argument. That does exactly what you think it does. It tells qmap() that we want a map of Seattle. The qmap() function understands city names, so you can ask for “chicago,” “san francisco,” etc. Play with it a little!
+
+We’re also setting a “zoom” parameter. Again, play with that number and see what happens. Currently, we’re setting zoom to 11. To be clear, you can use zoom to zoom in or zoom out on the specified location. In this case, we’re zooming in on the center of Seattle, and if we zoom in too much, we’ll omit parts of the city. For our purposes, a zoom of 11 is ideal.
+
+The maptype= parameter has been set to “toner”. The “toner” maptype is basically a black and white map. (Note that there are other maptypes, such as “satellite,” and “hybrid.” Try those out and see what happens.)
+
+On top of that, you’ll note that I’m using a parameter called “darken.” Effectively, I’m using darken to add color on top of the map (the hexidecimal color “#BBBBBB”). I’ve done this to subtly change the map color from pure black and white to shades of grey.
+
+###Make basic dot distribution map
+```{r}
+
+##########################
+# CREATE BASIC MAP
+#  - dot distribution map
+##########################
+map.seattle_city +
+  geom_point(data=df.seattle_crime, aes(x=Longitude, y=Latitude))
+```
+
+This map is a little ugly, but it’s instructive to examine what we’re doing in the code.
+
+Notice that the syntax is almost the same as the syntax for the basic scatterplot. In some sense, this is a scatterplot. 
+
+As proof, let’s create a scatterplot using the same dataset. Simply replace the map.seattle_city code with ggplot().
+```{r}
+#####################
+# CREATE SCATTERPLOT
+#####################
+ggplot() +
+  geom_point(data=df.seattle_crime, aes(x=Longitude, y=Latitude))
+```
+
+This is the exact same data and the same variable mapping. We’ve just removed the map.seattle_city context layer. Now, it’s just a basic scatterplot.
+
+That’s part of the reason I wanted to write up this tutorial. I’ve emphasized earlier that you should master the basic charts like the scatterplot. One reason I emphasize the basics is because the basic charts serve as foundations for more complicated charts. 
+
+In this case, the scatterplot is the foundation for the dot distribution map.
+
+Ok. Now, let’s go back to our map. You might have noticed that the data is really “dense.” All of the points are on top of each other. We call this “overplotting.” We’re going to modify our point geoms to deal with this overplotting.
+
+###Adjust point transparency to deal with overplotting
+```{r}
+#############################
+# ADD TRANSPARENCY and COLOR
+#############################
+
+map.seattle_city +
+  geom_point(data=df.seattle_crime, aes(x=Longitude, y=Latitude), color="dark green", alpha=.03, size=1.1)
+```
+
+Notice that we made some modifications within geom_point(). 
+
+We added color to make it a little more interesting.
+
+But more importantly, we modified two parameters: alpha= and size=. 
+
+The size= parameter obviously modifies the size of the point.
+
+alpha modifies the transparency. In this case, we’re making the points highly transparent so we can better see areas of Seattle with high levels of crime. We’re manipulating alpha levels to deal with overplotting.
+
+To be clear, there are other solutions for dealing with overplotting. This isn’t necessarily the best solution, but early in learning data science, this will be one of the simplest to implement.
+
+###Wrapping up
+
+The above tutorial shows you how to make a basic dot distribution map using R’s ggplot2 and ggmap.
+
+Note a few things:
+
+1. We’re building on foundational techniques. In this case, we’ve made a dot distribution map, which is just a modified scatterplot.  
+2. We built this plot iteratively. We started with the base map, then added points, and then modified those points. 
+
+It bears repeating that you should master the basics like the scatterplot, line, histogram, and bar chart. Also practice designing data visualizations iteratively. When you can do these things, you’ll be able to progress to more sophisticated visualization techniques.
+
+Finally, if you want the finsihed map, here’s the code:
+```{r}
+#################################
+# TILED version 
+#  tile border mapped to density
+#################################
+map.seattle_city +
+  stat_density2d(data=df.seattle_crime, aes(x=Longitude
+                                            , y=Latitude
+                                            ,color=..density..
+                                            ,size=ifelse(..density..<=1,0,..density..)
+                                            ,alpha=..density..)
+                 ,geom="tile",contour=F) +
+  scale_color_continuous(low="orange", high="red", guide = "none") +
+  scale_size_continuous(range = c(0, 3), guide = "none") +
+  scale_alpha(range = c(0,.5), guide="none") +
+  ggtitle("Seattle Crime") +
+  theme(plot.title = element_text(family="Trebuchet MS", size=36, face="bold", hjust=0, color="#777777")) 
+```
+  
+If you look carefully, you’ll notice that the code has quite a few similarities to the basic dot distribution map. (Again: master the basics, and you’ll start to understand what’s going on here.)

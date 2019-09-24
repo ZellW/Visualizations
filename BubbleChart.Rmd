@@ -1,0 +1,104 @@
+https://rpubs.com/esuess/Tools2
+
+
+A bubble chart can also just be straight up proportionally sized bubbles, but here we're going to cover how to create the variety that is like a scatterplot with a third, bubbly dimension.
+
+The advantage of this chart type is that it lets you compare three variables at once. One is on the x-axis, one is on the y-axis, and the third is represented by area size of bubbles. Have a look at the final chart to see what we're making.
+
+Step 1. Load the data
+
+Assuming you already have R open, the first thing we'll do is load the data. We're examining the same crime data the we did for our last tutorial. I've added state population this time around. One note about the data. The crime numbers are actually for 2005, while the populations are for 2008. This isn't a huge deal since we're more interested in relative populations than we are the raw values, but keep that in mind. 
+
+Okay, moving on. You can download the tab-delimited file here and keep it local, but the easiest way is to load it directly into R with the below line of code:
+```{r}
+crime <- read.csv("http://datasets.flowingdata.com/crimeRatesByState2005.tsv", header=TRUE, sep="\t") 
+```
+
+You're telling R to download the data and read it as a comma-delimited file with a header. This loads it as a data frame in the crime variable.
+
+Step 2. Draw some circles
+
+Now we can get right to drawing circles with the symbols() command. Pass it values for the x-axis, y-axis, and circles, and it'll spit out a bubble chart for you.
+```{r}
+symbols(crime$murder, crime$burglary, circles=crime$population) 
+```
+Run the line of code above, and you'll get this:
+
+
+Circles incorrectly sized by radius instead of area. Large values appear much bigger.
+
+
+All done, right? Wrong. That was a test. The above sizes the radius of the circles by population. We want to size them by area. The relative proportions are all out of wack if you size by radius. 
+
+Step 3. Size the circles correctly
+
+To size radiuses correctly, we look to the equation for area of a circle:
+
+Area of circle = πr2
+
+In this case area of the circle is population. We want to know r. Move some things around and we get this:
+
+r = √(Area of circle / π)
+
+Substitute population for the area of the circle, and translate to R, and we get this:
+```{r}
+radius <- sqrt( crime$population/ pi ) 
+
+
+symbols(crime$murder, crime$burglary, circles=radius) 
+```
+
+
+Circles correctly sized by area, but the range of sizes is too much. The chart is cluttered and unreadable.
+
+
+Yay. Properly scaled circles. They're way too big though for this chart to be useful. By default, symbols() sizes the largest bubble to one inch, and then scales the rest accordingly. We can change that by using the inches argument. Whatever value you put will take the place of the one-inch default. While we're at it, let's add color and change the x- and y-axis labels.
+```{r}
+symbols(crime$murder, crime$burglary, circles=radius, inches=0.35, fg="white", bg="red", xlab="Murder Rate", ylab="Burglary Rate") 
+```
+
+Notice we use fg to change border color, bg to change fill color. Here's what we get:
+
+Scale the circles to make the the chart more readable, and use the fg and bg arguments to change colors.
+
+Now we're getting somewhere.
+
+By the way, you can make a chart with other shapes too with symbols(). You can make squares, rectangles, thermometers, boxplots, and stars. They take different arguments than the circle. The squares, for example, are sized by the length of a side. Again, make sure you size them appropriately.
+
+Here's what squares look like, using the below line of code.
+```{r}
+symbols(crime$murder, crime$burglary, squares=sqrt(crime$population), inches=0.5) 
+```
+You can use squares sized by area instead of circles, too.
+
+
+Let's stick with circles for now.
+
+Step 4. Add labels
+
+As it is, the chart shows some sense of distribution, but we don't know which circle represents each state. So let's add labels. We do this with text(), whose arguments are x-coordinates, y-coordinates, and the actual text to print. We have all of these. Like the bubbles, the x is murders and the y is burglaries. The actual labels are state names, which is the first column in our data frame.
+
+With that in mind, we do this:
+```{r}
+text(crime$murder, crime$burglary, crime$state, cex=0.5) 
+```
+
+The cex argument controls text size. It is 1 by default. Values greater than one will make the labels bigger and the opposite for less than one. The labels will center on the x- and y-coordinates.
+
+Here's what it looks like.
+
+
+Add labels so you know what each circle represents.
+
+
+Step 5. Clean up
+
+Finally, as per usual, I clean up in Adobe Illustrator. You can mess around with this in R, if you like, but I've found it's way easier to save my file as a PDF and do what I want with Illustrator. I uncluttered the state labels to make them more readable, rotated the y-axis labels, so that they're horizontal, added a legend for population, and removed the outside border. I also brought Georgia to the front, because most of it was hidden by Texas.
+
+Here's the final version. Click the image to see it in full.
+
+
+Cleanup and a key make the chart more informative.
+
+
+And there you go. Type in ?symbols in R for more plotting options. Go wild.

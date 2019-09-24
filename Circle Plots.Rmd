@@ -1,0 +1,101 @@
+##Wind in Netherlands
+
+
+(This article was first published on Wiekvoet, and kindly contributed to R-bloggers) 
+In climate change discussions, everybody talks about temperature. But weather is much more than that. There is at least rain and wind as directly experienced quality, and air pressure as measurable quantity. In the Netherlands, some observation stations have more than a century of daily data on these things. The data may be broken in the sense that equipment and location can have changed. To quote: “These time series are inhomogeneous because of station relocations and changes in observation techniques. As a result, these series are not suitable for trend analysis. For climate change studies we refer to the homogenized series of monthly temperatures of De Bilt link or the Central Netherlands Temperature link.” Since I am not looking at temperature but wind, I will keep to this station’s data. 
+
+##Data
+
+Data are from daily observations from KNMI. I have chosen station [De Kooy](https://www.knmi.nl/nederland-nu/klimatologie/daggegevens). For those less familiar with Dutch geography, this is close to Den Helder, in the tip North West of Netherlands. This means pretty close to the North Sea, Wadden Sea and Lake IJssel. Wind should be relatively unhindered there. The data themselves are daily observations. For wind there are:
+
+DDVEC     Vector mean wind direction in degrees
+                  (360=north, 90=east, 180=south, 270=west, 0=calm/variable)
+FHVEC     Vector mean windspeed (in 0.1 m/s)
+FG             Daily mean windspeed (in 0.1 m/s)
+FHX          Maximum hourly mean windspeed (in 0.1 m/s)
+FHXH       Hourly division in which FHX was measured
+FHN          Minimum hourly mean windspeed (in 0.1 m/s)
+FHNH       Hourly division in which FHN was measured
+FXX          Maximum wind gust (in 0.1 m/s)
+FXXH       Hourly division in which FXX was measured
+
+The header of the data downloaded contains this, and much more information. I am sure there are good reasons to do speed in 0.1 m/s, but personally I find m/s more easy.
+
+The two first variables are ‘vector means’. It is obvious that one cannot simply average directions. Luckily there is the circular package, which does understand direction.
+
+Thus the data reading script becomes:
+```{r}
+r1 <- readLines("./data/NetherlandsWeather.txt")
+r2 <- r1[grep("^#",r1):length(r1)]
+explain <- r1[1:(grep("^#",r1)-1)]
+# explain
+r2 <- gsub("#","",r2)
+r3 <- read.csv(text=r2)
+library(dplyr)
+library(circular)
+methods(sd)
+r4 <- mutate(r3,
+    Date=as.Date(format(YYYYMMDD),format="%Y%m%d"),
+    year=floor(YYYYMMDD/1e4),
+    month=factor(format(Date,"%B"),levels=month.name),
+    rDDVEC=as.circular(DDVEC,units="degrees",template="geographics"),
+              # Vector mean wind direction in degrees 
+              # (360=north, 90=east, 180=south, 270=west, 0=calm/variable)
+    rFHVEC=FHVEC/10, # Vector mean windspeed (in 0.1 m/s)
+    rFG=FG/10,   # Daily mean windspeed (in 0.1 m/s) 
+    rFHX=FHX/10, # Maximum hourly mean windspeed (in 0.1 m/s)
+    rFHN=FHN/10, # Minimum hourly mean windspeed (in 0.1 m/s)
+    rFXX=FXX/10 # Maximum wind gust (in 0.1 m/s)
+    ) %>%
+    select(.,YYYYMMDD,Date,year,month,rDDVEC,rFHVEC,
+        rFG,rFHX,rFHN,rFXX) 
+```
+##Plots
+
+Plot of mean wind speed shows several effects. There is an equipment change just before year 2000. At the beginning of the curve the values are lowest, while in the sixties there is a bit more wind, as was n the nineties. I wonder about that. Is that equipment? I can imagine that hundred years ago there was lesser equipment giving such a change, but fifty or twenty years ago? Finally, close to the end of the war there is missing data.
+```{r}
+library(ggplot2)
+ggplot(data=r4,aes(y=rFG,x=Date))+
+    geom_smooth()+
+    geom_point(alpha=.03) +
+    ylab("Mean wind speed x (m/s)")+
+    xlab("Year") 
+```
+
+A second plot is by month. This shows somewhat different patterns. There is still most wind in the middle of last century. However, September and October have the most wind just before 1950, while November and December have most wind after 1950. Such a pattern cannot be attributed to changes in equipment. It would seem there is some kind of change in wind speeds then.
+```{r}
+r5 <- group_by(r4,month,year) %>%
+    summarise(.,mFG=mean(rFG),mFHX=max(rFHX),mFXX=max(rFXX))
+ggplot(data=r5,aes(y=mFG,x=year)) +
+    geom_smooth(method="loess") +
+    geom_point(alpha=.5)+
+    facet_wrap(~ month)
+```  
+##Wind direction
+
+In the Netherlands there is a clear connection between wind and the remainder of the weather. Most of the wind is from the SW (south west, I will be using N, E, S, W to abbreviate directions from here on). N, NW, W and SW winds take humidity from the North Sea and Atlantic Ocean, which in turn will bring rain. In winter, the SW wind will also bring warmth, there will be no frost with W and SW wind. In contrast, N, NE and E will bring cold. A winter wind from Siberia will bring skating fever. In summer, the nice and sunny weather is associated with S to E winds the E wind in May is associated with nice spring weather. SE is by far the least common direction. 
+
+The circular package has a both density and plot functions. Combining these gets the following directions for the oldest part of the data. 
+```{r}
+par(mfrow=c(3,4),mar=c(0,0,3,0))
+lapply(month.name,function(x) {
+      xx <- r4$rDDVEC[r4$year<1921 & r4$month==x]
+      xx <- xx[!is.na(xx)]
+      density(xx,bw=50)  %>% 
+          plot(main=x,xlab="",ylab="",shrink=1.2)
+      1
+    })
+title("1906-1920", line = -1, outer = TRUE)
+```
+I would be hard pressed to see significant differences between old and recent data. The densities are slightly different, but not really impressive. Note the lack of E wind in summer, indicating that recent summers have been not been very spectacular.
+```{r}
+par(mfrow=c(3,4),mar=c(0,0,2,0))
+lapply(month.name,function(x) {
+      xx <- r4$rDDVEC[r4$year>=2000 & r4$month==x]
+      xx <- xx[!is.na(xx)]
+      density(xx,bw=50)  %>% 
+          plot(main=x,xlab="",ylab="",shrink=1.2)
+      1
+    })
+title("2000-now", line = -1, outer = TRUE)
+``` 

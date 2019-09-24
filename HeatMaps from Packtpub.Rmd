@@ -1,0 +1,192 @@
+---
+title: "HeatMaps from Packtpub"
+output: html_document
+---
+#Part 1
+
+##Introduction
+
+Learn how to create simple and advanced heat maps, customize them, and create a nice output for presentations. We will be using data from various different file formats as input and work on our heat maps to add some interactivity to them.
+
+We will also take a look at simple heat maps by creating a choropleth map of the United States and make a contour plot from topographical volcano data.
+
+In this recipe, we will learn how to construct our first heat map in R from the AirPassenger data set, which is a standard data set included in the data package that is available with R distributions. For this task, we will use the levelplot() function from the lattice package and explore the enhanced features of the gplots package, the heatmap.2() function.
+
+##Getting ready
+
+```{r}
+### loading packages
+if (!require("gplots")) {
+install.packages("gplots", dependencies = TRUE)
+library(gplots)
+}
+if (!require("lattice")) {
+install.packages("lattice", dependencies = TRUE)
+library(lattice)
+}
+
+### loading data
+data(AirPassengers)
+
+### converting data
+rowcolNames <- list(as.character(1949:1960), month.abb)
+air_data <- matrix(AirPassengers, 
+  ncol = 12, 
+  byrow = TRUE, 
+  dimnames = rowcolNames)
+
+### drawing heat maps
+pdf("firstHeatmaps.pdf")
+
+# 1) Air Passengers #1
+print(levelplot(air_data,
+  col.regions=heat.colors, 
+  xlab = "year",
+  ylab = "month", 
+  main = "Air Passengers #1"))
+
+# 2) Air Passengers #2
+heatmap.2(air_data, 
+  trace = "none", 
+  density.info = "none", 
+  xlab = "month", 
+  ylab = "year", 
+  main = "Air Passengers #2")
+
+# 3) Air Passengers #3
+heatmap.2(air_data, 
+  trace = "none", 
+  xlab = "month", 
+  ylab = "year", 
+  main = "Air Passengers #3",
+  density.info = "histogram",
+  dendrogram = "column",
+  keysize = 1.8)
+
+dev.off()
+```
+A PDF has been created with some heat maps.
+
+##How it works...
+
+There are different functions for drawing heat maps in R, and each has its own advantages and disadvantages. In this recipe, we will take a look at the levelplot() function from the lattice package to draw our first heat map. Furthermore, we will use the advanced heatmap.2() function from gplots to apply a clustering algorithm to our data and add the resulting dendrograms to our heat maps.
+
+The following image shows an overview of the different plotting functions that we are using throughout this book:
+
+![](../images/Capture.JPG) 
+
+Now let us take a look at how we read in and process data from different data files and formats step-by-step:
+
+
+1. Loading packages: The first eight lines preceding the ### loading data section will make sure that R loads the lattice and gplots package, which we need for the two heat map functions in this recipe: levelplot() and heatmap.2().
+
+Note:  Each time we start a new session in R, we have to load the required packages in order to use the levelplot() and heatmap.2() functions. To do so, enter the following function calls directly into the R command-line or include them at the beginning of your script:
+
+* library(lattice) 
+* library(gplots) 
+
+2. Loading the data set: R includes a package called data, which contains a variety of different data sets for testing and exploration purposes. More information on the different data sets that are contained in the data package can be found at http://stat.ethz.ch/ROmanual/ROpatched/library/datasets/.
+
+For this recipe, we are loading the AirPassenger data set, which is a collection of the total count of air passengers (in thousands) for international airlines from 1949-1960 in a time-series format.
+```{r}
+data("AirPassengers")
+```
+
+Converting the data set into a numeric matrix: Before we can use the heat map functions, we need to convert the AirPassenger time-series data into a numeric matrix first. Numeric matrices in R can have characters as row and column labels, but the content itself must consist of one single mode: numerical.
+
+We use the matrix() function to create a numeric matrix consisting of 12 columns to which we pass the AirPassenger time-series data row-by-row. Using the argument dimnames = rowcolNames, we provide row and column names that we assigned previously to the variable rowColNames, which is a list of two vectors: a series of 12 strings representing the years 1949 to 1960, and a series of strings for the 12 three-letter abbreviations of the months from January to December, respectively.
+```{r}
+rowcolNames <- list(as.character(1949:1960), month.abb)
+air_data <- matrix(AirPassengers, 
+  ncol = 12, 
+  byrow = TRUE, 
+  dimnames = rowcolNames)
+```
+
+4. A si mple heat map using levelplot(): Now that we have converted the AirPassenger data into a numeric matrix format and assigned it to the variable air_data, we can go ahead and construct our first heat map using the levelplot() function from the lattice package:
+```{r}
+print(levelplot(air_data,
+  col.regions=heat.colors, 
+  xlab = "year",
+  ylab = "month", 
+  main = "Air Passengers #1"))
+```
+
+The levelplot() function creates a simple heat map with a color key to the right-hand side of the map. We can use the argument col.regions = heat.colors to change the default color transition to yellow and red. X and y axis labels are specified by the xlab and ylab parameters, respectively, and the main parameter gives our heat map its caption.
+
+Note:  In contrast to most of the other plotting functions in R, the lattice package returns objects, so we have to use the print() function in our script if we want to save the plot to a data file. In an interactive R session, the print() call can be omitted. Typing the name of the variable will automatically display the referring object on the screen.
+
+5. Creating enhanced heat maps with heatmap.2(): Next, we will use the heatmap.2() function to apply a clustering algorithm to the AirPassenger data and to add row and column dendrograms to our heat map:
+```{r}
+heatmap.2(air_data, 
+    trace = "none", 
+    density.info = "none", 
+  xlab = "month", 
+  ylab = "year", 
+  main = "Air Passengers #2")
+```
+
+Note:  Hierarchical clustering is especially popular in gene expression analyses. It is a very powerful method for grouping data to reveal interesting trends and patterns in the data matrix.
+
+Another neat feature of heatmap.2() is that you can display a histogram of the count of the individual values inside the color key by including the argument density.info = NULL in the function call. Alternatively, you can set density.info = "density" for displaying a density plot inside the color key.
+
+By adding the argument keysize = 1.8, we are slightly increasing the size of the color key—the default value of keysize is 1.5:
+```{r}
+heatmap.2(air_data, 
+  trace = "none", 
+  xlab = "month", 
+  ylab = "year", 
+  main = "Air Passengers #3",
+  density.info = "histogram",  
+  dendrogram = "column",
+  keysize = 1.8) 
+```
+
+Did you notice the missing row dendrogram in the resulting heat map? This is due to the argument dendrogram = "column" that we passed to the heat map function. Similarly, you can type row instead of column to suppress the column dendrogram, or use neither to draw no dendrogram at all.
+
+##There's more...
+
+By default, levelplot() places the color key on the right-hand side of the heat map, but it can be easily moved to the top, bottom, or left-hand side of the map by modifying the space parameter of colorkey:
+```{r}
+levelplot(air_data, col.regions = heat.colors, colorkey = list(space = "top"))
+```
+Replacing top by left or bottom will place the color key on the left-hand side or on the bottom of the heat map, respectively.
+
+Moving around the color key for heatmap.2() can be a little bit more of a hassle. In this case we have to modify the parameters of the layout() function. By default, heatmap.2() passes a matrix, lmat, to layout(), which has the following content:
+
+     [,1] [,2]
+[1,]    4    3
+[2,]    2    1
+
+The numbers in the preceding matrix specify the locations of the different visual elements on the plot (1 implies heat map, 2 implies row dendrogram, 3 implies column dendrogram, and 4 implies key). If we want to change the position of the key, we have to modify and rearrange those values of lmat that heatmap.2() passes to layout().
+
+For example, if we want to place the color key at the bottom left-hand corner of the heat map, we need to create a new matrix for lmat as follows:
+
+lmat
+     [,1] [,2]
+[1,]    0    3
+[2,]    2    1
+[3,]    4    0
+
+We can construct such a matrix by using the rbind() function and assigning it to lmat:
+```{r}
+lmat = rbind(c(0,3),c(2,1),c(4,0))
+lmat
+```
+
+Furthermore, we have to pass an argument for the column height parameter lhei to heatmap.2(), which will allow us to use our modified lmat matrix for rearranging the color key:
+```{r}
+heatmap.2(air_data, dendrogram = "none", trace = "none", density.info = "none", 
+   keysize = "1.3", xlab = "month", ylab = "year", main = "Air Passengers",
+   lmat = rbind(c(0,3),c(2,1),c(4,0)), lhei = c(1.5,4,1.5))
+```
+If you don't need a color key for your heat map, you could turn it off by using the argument key = FALSE for heatmap.2() and colorkey = FALSE for levelplot(), respectively.
+
+Tip:  R also has a base function for creating heat maps that does not require you to install external packages and is most advantageous if you can go without a color key. The syntax is very similar to the heatmap.2() function, and all options for heatmap.2() that we have seen in this recipe also apply to heatmap():
+```{r}
+heatmap(air_data, 
+    xlab = "month", 
+    ylab = "year", 
+    main = "Air Passengers")
+```
+

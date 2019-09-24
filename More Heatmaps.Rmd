@@ -1,0 +1,126 @@
+#More HeatMaps
+
+##Example 1
+
+see http://www.r-bloggers.com/using-r-correlation-heatmap-take-2/
+```{r}
+data <- airquality[,1:4]
+library(ggplot2)
+library(reshape2)
+qplot(x=Var1, y=Var2, data=melt(cor(data, use="p")), fill=value, geom="tile") +
+     scale_fill_gradient2(limits=c(-1, 1))
+```
+
+see https://martinsbioblogg.wordpress.com/2013/03/21/using-r-correlation-heatmap-with-ggplot2/
+```{r}
+data(attitude)
+library(ggplot2)
+library(reshape2)
+qplot(x=Var1, y=Var2, data=melt(cor(attitude)), fill=value, geom="tile")
+```
+
+##Example 3
+
+See http://www.r-bloggers.com/r-heatmaps-with-gplots/
+
+I use heatmaps quite a lot for visualizing data, microarrays of course but also DNA motif enrichment, base composition and other things. I particular like the heatmap.2 function of the gplots package. It has a couple of defaults that are a little ugly but they are easy to remove. Here is a quick example:
+
+First lets make some example microarray data.
+
+```{r}
+exampleData <- matrix(log2(rexp(1000)/rexp(1000)),nrow=200)
+```
+This just makes two exponential distributions and takes the log2 ratio to make it look a bit like microarray fold changes, but this really could be able matrix of numbers.
+
+Next I will just plot the most variable row/genes/whatever, this step is obviously optional but it reduces the size of the plot to make them easier to see, and normally I only care about the things that are different.
+
+```{r}
+evar <- apply(exampleData,1,var)
+
+mostVariable <- exampleData[evar>quantile(evar,0.75),] 
+```
+This just calculates the variance of each row in the matrix, then makes a new matrix of those rows that have a variance that is above the 75th percentile, so the top 25% most variable row. 
+
+```{r}
+#install.packages(“gplots”)
+
+library(gplots)
+
+heatmap.2(mostVariable, trace="none", col=greenred(10))
+
+```
+Next we load the gplots package (install it first if you do not already have it). We then simple pass the mostVariable matrix to the heatmap.2 function. The trace=”none” option removes a default, which is to add a line to each column, which I find distracting. The col=greenred(10) option uses another gplots function (greenred), which simply generates a color scheme from green to red via black. You could use any color scheme here such as col=rainbow(10) or a scheme from RColorBrewer.
+
+That is about it really for basic heatmaps. 
+
+For more advanced heatmaps, you can do other things such as adding color strips to the rows or columns to show groupings, for example:
+
+```{r}
+heatmap.2(mostVariable, trace="none",  col=greenred(10), ColSideColors = bluered(5)) 
+```
+Another useful trick is not to use the default clustering methods of heatmap.2, but use your own.  For example :
+
+```{r}
+ord <- order(rowSums(abs(mostVariable)),decreasing=T)
+
+heatmap.2(mostVariable[ord,],Rowv=F,dendrogram="column",trace="none",col=greenred(10))
+```
+Here were are generating the ordering of the rows ourselves, in this case by the sum of the absolute values of each row. Then we turn off the clustering of the rows and the row dendrogram and get something like this: 
+
+##Example 2
+
+see https://github.com/slzhao/heatmap3/blob/master/vignettes/vignette.pdf
+
+Simulate a gene expression data set with 40 probes and 25 samples. These samples are divided into 3 groups, 5 in control group, 10 in treatment A and 10 in treatment B group. We will use the groups as categorical phenotype and we assume there is one continuous phenotype. Then we will annotate the two phenotypes in heatmap result.
+
+Here we provided two samples:
+
+The first example is simple. It generated the color bar as lengend, ploted row side color bars with two columns, didn't plot row dendrogram, and some cells at the bottom left were labeled by specified colors.
+
+The second example ploted color bars and its legend to display a continuous variable in row side, texted labels with specified colors, ploted column side phenotype annotation. Then we provided a cutoff height so that the samples will be cut into different clusters by the cutoff. And statistic tests for annotations in different groups will be performed and the result will be returned.
+
+```{r}
+library(heatmap3)
+example(heatmap3)
+
+```
+
+Completely compatible with the original R function heatmap. You don't need to learn anything new or change your old commands to use it.
+Provides highly customizable function interface so that the users can use their own functions to generate legend or side annotation. And two convenient example functions were also provided. 
+Provides a height cutoff so that the samples will be cut into different clusters by the cutoff and labeled by different colors. And then statistic tests for the distribution of annotations in different clusters will be performed. 
+More convenient coloring features: Provides color legend for the input matrix automatically. A more fancy color series is set as default color. You can balance the colors in color legend so that you can ensure the median color will represent the 0 value.
+More powerful labeling features: The labels in axis could be labeled with colors. The side color bars support more than one column of colors.
+The color legend, column and row side color bars can exist in the same figure, which can't be done in other heatmap compatible packages.
+Improvement in parameters: Pearson correlation is set as default method; the agglomeration method for clustering now can be specified; the input values can be transformed into matrix automatically if it is a data.frame.
+
+
+The main function is heatmap3, which was generate form the R function heatmap. So it is completely compatible with the original R function heatmap. You can use your commands for heatmap in heatmap3 as well. And you can use ?heatmap3 to get help for its new parameters. Here I just listed some of the new parameters for your information.
+
+legendfun: function used to generate legend in top left of the figure. More details will be discussed below.
+
+ColSideFun and ColSideAnn: function used to generate annotation and labeling figure in column side. The users can use any plot functions to generate their own figure. More details will be discussed below.
+ColSideCut: the value to be used in cutting coloum dendrogram. The dendrogram and annotation will be divided into different parts and labeled respectively.
+method: the agglomeration method to be used by hclust function.
+ColAxisColors, RowAxisColors: integer indicating which column of ColSideColors or RowSideColors will be used as colors for labels in axis.
+showColDendro, showRowDendro: logical indicating if the column or row dendrogram should be plotted.
+
+
+A very important new feature in heatmap3 is the legendfun and ColSideFun parameter. You can generate your own legend in the top left of the figure by legendfun. And generate your own sample annotation in column side. Here we provided a function called showLegend as an example. 
+```{r}
+library(heatmap3)
+showLegend
+```
+This function is very simple. It first generates a empty figure and then uses the R function legend to generate legend. So you can simplely write your own function to show legend or something else in the top left of the figure. Here is an example for showLegend function.
+```{r}
+example(showLegend)
+```
+We also provided a showAnn function as an example to show column side annotation.
+
+```{r}
+example(showAnn)
+```
+
+See also:
+
+https://rpubs.com/maxboeck82/modelHeat
+

@@ -1,0 +1,104 @@
+---
+title: "Business Value - Visualizing with `transitionPlot`"
+output:
+  html_document:
+    highlight: pygments
+    theme: spacelab
+    toc: yes
+header-includes: \usepackage{graphicx} \usepackage{mathtools}
+---
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+if(!require(easypackages)){
+    install.packages("easypackages")
+    library(easypackages)
+}
+packages("dplyr", "Gmisc", "RColorBrewer", prompt = FALSE)
+```
+
+## Transition plot
+
+It’s closely related to the `plotMat` for plotting networks but aimed at less complex relations with only a one-way relation between two groups of states.  Wait till you see this - it is something you can likely use all the time in your job!
+
+## Simulate some data
+
+We start by creating some sample data/
+
+```{r warning=FALSE, message=FALSE}
+before <- sample(1:3, replace = TRUE, size = 500, prob = c(0.1, 0.4, 0.5))
+after <- sample(1:3, replace = TRUE, size = 500, prob = c(0.3, 0.5, 0.2))
+before <- factor(before, labels = c("None", "Moderate", "Major"))
+after <- factor(after, labels = c("None", "Moderate", "Major"))
+# Create the transition matrix
+transition_matrix <- table(before, after)
+# Create a table with the transitions
+htmlTable(transition_matrix, title = "Transitions", ctable = TRUE)
+```
+
+## Basic Example
+
+This is simple to understand but understanding the flow can be challenging and time-consuming. Visualizing it using the transition plot gives a quick and more intuitive understanding:
+
+```{r warning=FALSE, message=FALSE}
+transitionPlot(transition_matrix)
+```
+
+Here you can see the thick lines representing the transition from that particular group into the next. So far I’ve used the graph for the same measure on left and right side but I guess your imagination sets the limit. It can just as well be two or more treatment arms with some discrete outcomes.
+
+### Basic Improvement - Arrows
+
+Change the arrow type to my alternative arrow we get a nicer plot:
+
+```{r}
+transitionPlot(transition_matrix, overlap_add_width = 1.3, type_of_arrow = "simple")
+```
+
+### Basic Improvement - Arrows with Gradient
+
+Added a white background to each arrow in order to visually separate the arrows (the overlay order can be customized with the overlap order parameter). To further enhance the transition add the option of a color gradient. To do this you need to specify arrow_type = “gradient”:
+
+```{r}
+transitionPlot(transition_matrix, overlap_add_width = 1.3, type_of_arrow = "gradient")
+```
+
+## Add Coloring
+
+Additionally you can choose different colors for your boxes:
+
+```{r}
+transitionPlot(transition_matrix, txt_start_clr = "black", txt_end_clr = "black",
+	fill_start_box = brewer.pal(n = 3, name = "Pastel1"), fill_end_box = brewer.pal(n = 6, name = "Pastel1")[4:6],
+	overlap_add_width = 1.3, type_of_arrow = "gradient")
+```
+
+## Add Proportions
+
+Sometimes you might want to split the color of each box into two colors to illustrate a proportion. Note that the gradient color is a blend between the two proportions:
+
+```{r}
+transitionPlot(transition_matrix, box_prop = cbind(c(0.3, 0.7, 0.5), c(0.5, 0.5, 0.4)),
+	txt_start_clr = c("black", "white"), txt_end_clr = c("black", "white"),
+	fill_start_box = brewer.pal(n = 3, name = "Paired")[1:2], fill_end_box = brewer.pal(n = 3, name = "Paired")[1:2],
+	overlap_add_width = 1.3, type_of_arrow = "gradient")
+```
+
+## Highlighting Arrows
+
+Another interesting option may be to highlight a certain transition:
+
+```{r}
+arr_clrs <- c(rep(grey(0.5), times = 3), c(grey(0.5), "black", grey(0.5)), rep(grey(0.5), times = 3))
+
+transitionPlot(transition_matrix, arrow_clr = arr_clrs, overlap_order = c(1, 3, 2),
+	box_prop = cbind(c(0.3, 0.7, 0.5), c(0.5, 0.5, 0.4)),
+	txt_start_clr = c("black", "white"), txt_end_clr = c("black", "white"),
+	fill_start_box = brewer.pal(n = 3, name = "Paired")[1:2], fill_end_box = brewer.pal(n = 3, name = "Paired")[1:2],
+	overlap_add_width = 1.3, type_of_arrow = "gradient")
+```
+
+## Summary
+
+The function transitionPlot is included in my [Gmisc-package](http://gforge.se/packages/).
+
+This is not my original work.  See See http://gforge.se/2013/06/visualizing-transitions-with-the-transitionplot-function/.  I made minor changes/improvements.  It is very cool that this was developed by an orthopedic surgeon!
+
+Another explanation and example can be found here:  https://cran.r-project.org/web/packages/Gmisc/vignettes/transitionPlot.html

@@ -1,0 +1,117 @@
+---
+title: "Introduction to Mapping Census Data"
+output: html_document
+---
+
+```{r message=FALSE, warning=FALSE}
+if(!require(easypackages)){
+    install.packages("easypackages")}
+library(easypackages)
+packages("tidyverse", "tidycensus", "leaflet", "stringr", "sf", "rvest", prompt = FALSE)
+```
+
+## Introduction to tidycensus package
+
+One of the great things about R is the rapid development of R packages.  I used to review each new package as it was released but this quickly become overwhelming.  There are nearly 11,000 packages available.  Heck, since R is my hammer, here is a short script you can use to count the number of R packages.  As of the publication date of this document, there are 10,945.  It is likely there will be more than 11,000 shortly.  Approximately 200 new packages are introduced each month and that rate is growing.
+
+```{r rvestCode, warning=FALSE, message=FALSE}
+pkgs <- "https://cran.r-project.org/web/packages/available_packages_by_date.html"
+pkgs_raw <- read_html(pkgs) %>% html_nodes("table") %>% .[[1]] %>% html_table()
+nrow(pkgs_raw)
+```
+
+One of the packages I have followed since it was introduced is Kyle Walker’s [tidycensus package](https://github.com/walkerke/tidycensus).  `tidycensus` is an R package that allows users to interface with the US Census Bureau's decennial Census and five-year American Community APIs and return tidyverse-ready data frames with simple feature geometry included as an option.
+
+If you have not looked at the 1200+ variables available in Census data, you do not know what you are missing.  I commonly use Census data to help clients build higher performing machine learning algorithms using data directly from the Census.
+
+I thought I would use `tidycensus` to explore some Census data and provide helpful map visualizations.
+
+> Before running code the code below, you need to obtain an API key from the Census and then use the function census_api_key() to set it in R.  (The key should be in quotes.)
+
+census_api_key(api_key) where api_key is a character string representing your Census API key.  It is simply to request a Census key - just go [here](http://api.census.gov/data/key_signup.html) and request one.  It will only take a minute or two.
+
+Lets get started.  I'll focus on North Carolina since that is where I am living.  Please note that this is just an introduction.  I am leaving out much detail on the Census data and descriptions of each argument.
+
+> Note the argument geometry = TRUE
+
+```{r}
+NC_pop <- get_acs(geography = "county", variables = "B01003_001", state = "NC", geometry = TRUE) 
+
+head(NC_pop)
+```
+
+The population in each county in NC prepared for you in a data frame. That was easy!
+
+The tigris package (a dependency of tidycensus) makes it simple to create map visualizations. When you set `geometry = TRUE` like we did above, the Census shapefiles are downloaded with support for `sf` simple features. Below we use `st_transform` which is from the [sf package](https://cran.r-project.org/web/packages/sf/vignettes/sf1.html).  This link will help explain `st_transform` and `espg:4326`.  The good news is you do not have to get too deep in the weeds and know all the details.  You can freely reuse the code below!
+
+```{r message=FALSE}
+pal <- colorQuantile(palette = "viridis", domain = NC_pop$estimate, n = 10)
+
+NC_pop %>%
+    st_transform(crs = "+init=epsg:4326") %>%
+    leaflet(width = "100%") %>%
+    addProviderTiles(provider = "CartoDB.Positron") %>%
+    addPolygons(popup = ~ str_extract(NAME, "^([^,]*)"),
+                stroke = FALSE, smoothFactor = 0, fillOpacity = 0.7, color = ~ pal(estimate)) %>% 
+                addLegend("bottomright", pal = pal, values = ~ estimate, 
+                title = "County Populations", opacity = 1)
+```
+
+There is so much other information available from the Census. For example, what if I want to look at the median home value in Mecklenburg County - where I live - at the census tract level?
+
+```{r message=FALSE}
+medianHome_value <- get_acs(geography = "tract", variables = "B25077_001", state = "NC", 
+                  county = "Mecklenburg", geometry = TRUE)
+
+pal <- colorNumeric(palette = "viridis", domain = medianHome_value$estimate)
+
+medianHome_value %>%
+    st_transform(crs = "+init=epsg:4326") %>%
+    leaflet(width = "100%") %>%
+    addProviderTiles(provider = "CartoDB.Positron") %>%
+    addPolygons(popup = ~ str_extract(NAME, "^([^,]*)"),
+                stroke = FALSE, smoothFactor = 0, fillOpacity = 0.7, color = ~ pal(estimate)) %>%
+    addLegend("bottomright", pal = pal, values = ~ estimate, title = "Median Home Value",
+              labFormat = labelFormat(prefix = "$"), opacity = 1)
+```
+
+If you are familair with Charlotte, NC, you will understnad that the more expensive homes are typically found in South Charlotte.
+
+I know this was quick and short of the R code details but hopefully this provides you the courage you get familiar with Census data and perhaps impress your friends with some helpful visulizations.
+
+More to come!
+
+## Appendix
+
+### Using `tidycensus`
+There are two major functions implemented in `tidycensus`: `get_decennial`, which grants access to the 1990, 2000, and 2010 decennial US Census APIs, and `get_acs`, which grants access to the 5-year American Community Survey APIs. 
+
+Getting variables from the Census or ACS requires knowing the variable ID - and there are thousands of these IDs across the different Census files. To rapidly search for variables, use the load_variables function. The function takes two required arguments: the year of the Census or endyear of the ACS sample, and the dataset - one of `sf1`, `sf3`, or `acs5`. For ideal functionality, I recommend assigning the result of this function to a variable, setting cache = TRUE to store the result on your computer for future access, and using the View function in RStudio to interactively browse for variables.
+
+```{r}
+#install_github("walkerke/tidycensus")#reuired reinstall to prevent this from erroring out
+v15 <- load_variables(2015, "acs5", cache = FALSE)
+View(v15)
+#filter(v15, grepl("income", v15$concept))
+```
+
+```{r}
+#see https://walkerke.github.io/2017/05/tidycensus-every-tract/
+library(purrr)
+us <- unique(fips_codes$state)[1:51]
+
+totalpop <- map_df(us, function(x) {
+  get_acs(geography = "tract", variables = "B01003_001", 
+          state = x, geometry = TRUE)
+})
+str(totalpop)
+
+NCPopTract <- get_acs(geography = "tract", variables = "B01003_001", state = "NC", geometry = TRUE)
+```
+
+### Great Examples of Using Census Data
+
+- https://rpubs.com/janderman/data607_final_proj
+- https://rpubs.com/chrisgmartin/HISB
+
+

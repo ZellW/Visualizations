@@ -1,0 +1,20 @@
+---
+title: "Plotly - 2D Histogram"
+output: html_document
+---
+
+Interactive 2D Histogram - Looks like a Heat Map to me!
+```{r}
+library(plotly)
+s <- matrix(c(1, -.75, -.75, 1), ncol = 2)
+obs <- mvtnorm::rmvnorm(500, sigma = s)
+plot_ly(x = obs[,1], y = obs[,2], type = "histogram2d")
+```
+Let's try another heatmap concept that provides interactive features.
+```{r}
+#install.packages("d3heatmap")
+library(d3heatmap)
+url <-"http://datasets.flowingdata.com/ppg2008.csv"
+nba_players <- read.csv(url, row.names = 1)
+d3heatmap(nba_players, scale = "column")
+```

@@ -1,0 +1,97 @@
+
+See http://www.r-bloggers.com/exploratory-data-analysis-quantile-quantile-plots-for-new-yorks-ozone-pollution-data/
+See http://www.statmethods.net/stats/rdiagnostics.html
+See http://www.statmethods.net/advgraphs/probability.html
+
+A quantile-quantile plot, or Q-Q plot, is a plot of the sorted quantiles of one data set against the sorted quantiles 
+of another data set.  It is used to visually inspect the similarity between the underlying distributions of 2 data sets.
+Each point (x, y) is a plot of a quantile of one distribution along the vertical axis (y-axis) against the corresponding 
+quantile of the other distribution along the horizontal axis (x-axis).  If the 2 distributions are similar, then the 
+points would lie close to the identity line, y = x.
+
+##### Quantile-Quantile Plots of Ozone Pollution Data
+##### By Eric Cai - The Chemical Statistician
+# clear all variables
+#rm(list = ls(all.names = TRUE))
+
+# view first 6 entries of the "Ozone" data frame 
+head(airquality)
+
+# extract "Ozone" data vector
+ozone = airquality$Ozone
+
+# sample size of "ozone"
+length(ozone)
+
+# summary of "ozone"
+summary(ozone)
+
+# remove missing values from "ozone"
+ozone = ozone[!is.na(ozone)]
+
+# having removed missing values, find the number of non-missing values in "ozone"
+n = length(ozone)
+
+# calculate mean, variance and standard deviation of "ozone"
+mean.ozone = mean(ozone)
+var.ozone = var(ozone)
+sd.ozone = sd(ozone)
+
+Now, let’s set the n points in the interval (0,1) for the n equi-probable point-wise  probabilities, each of which is 
+assigned to the correspondingly ranked quantile.  (The smallest probability is assigned to the smallest quantile, and 
+the largest probability is assigned to the largest quantile.)  These probabilities will be used to calculate the quantiles 
+for each hypothesized theoretical distribution.
+
+# set n points in the interval (0,1)
+# use the formula k/(n+1), for k = 1,..,n
+# this is a vector of the n probabilities
+probabilities = (1:n)/(n+1)
+
+Since “ozone” is a continuous variable, let’s try fitting it to the normal distribution – the most commonly used distribution 
+for continuous variables.  Notice my use of the qnorm() function to calculate the quantiles from the normal distribution.  
+Specifically, I used the sample mean and the sample standard deviation of “ozone” to specify the parameters of the normal distribution.
+# calculate normal quantiles using mean and standard deviation from "ozone"
+
+normal.quantiles = qnorm(probabilities, mean(ozone, na.rm = T), sd(ozone, na.rm = T))
+
+
+
+Finally, let’s plot the theoretical quantiles on the horizontal axis and the sample quantiles on the vertical axis.  
+Notice my use of the abline() function to add the identify line.  The two parameters call for a line with an intercept 
+of 0 and a slope of 1.
+
+# normal quantile-quantile plot for "ozone"
+png('INSERT YOUR DIRECTORY PATH HERE')
+plot(sort(normal.quantiles), sort(ozone) , xlab = 'Theoretical Quantiles from Normal Distribution', ylab = 'Sample Quqnatiles of Ozone', main = 'Normal Quantile-Quantile Plot of Ozone')
+abline(0,1)
+dev.off()
+
+The plotted points do not fall closely onto the identity line, so the data do not seem to come from the normal distribution.  
+Is there another distribution that would work better?
+
+Recall from my earlier post on kernel density estimation that the “ozone” data are right-skewed.  A gamma distribution with 
+a small shape parameter tends to be right-skewed, so let’s try this instead.  Notice my use of the sample mean and sample 
+variance to estimate the shape and the scale parameters.
+# calculate gamma quantiles using mean and standard deviation from "ozone" to calculate shape and scale parameters
+
+gamma.quantiles = qgamma(probabilities, shape = mean.ozone^2/var.ozone, scale = var.ozone/mean.ozone)
+
+# gamma quantile-quantile plot for "ozone"
+png('INSERT YOUR DIRECTORY PATH HERE')
+plot(sort(gamma.quantiles), sort(ozone), xlab = 'Theoretical Quantiles from Gamma Distribution', ylab = 'Sample Quantiles of Ozone', 
+main = 'Gamma Quantile-Quantile Plot of Ozone')
+
+abline(0,1)
+dev.off()
+
+R has functions for quickly producing Q-Q plots; they are qqnorm(), qqline(), and qqplot().  These are good functions to use.  
+I built the above Q-Q plots using more rudimentary functions because
+
+•I wanted to use R’s rudimentary functions to illustrate the 5 steps of creating a Q-Q plot
+•My method ensures that the sample quantiles and the theoretical quantiles are on the same scale.
+ 
+qqnorm(ozone)
+qqline(ozone)
+
+boxplot(ozone)
+

@@ -1,0 +1,41 @@
+##Nice Plot
+```{r}
+library(plyr)
+library(ggplot2)
+
+salary <- read.csv("./data/SalaryInfo.csv", na.strings = "")
+head(salary)
+```
+The X and X.1 columns have nothing but the $ sign, so we can remove them. Also, the base salary is stored as factor. To convert to numeric, first we have to remove the commas in the data. We can use the gsub function for this. Next, we need to convert it to numeric. However, we cannot directly convert from factor to numeric, because R assigns a factor level to each data variable and if you convert it directly, it will just return that number. The way to convert it without losing information is to first convert it to character and then to numeric.
+```{r}
+salary$X <- NULL
+salary$X.1 <- NULL
+
+salary$Base.Salary <- gsub(',', '', salary$Base.Salary)
+salary$Base.Salary <- as.numeric(as.character(salary$Base.Salary))
+salary$Base.Salary <- salary$Base.Salary / 1000000
+```
+
+I decided to divide the salary by a million so that everyone’s salary is displayed in units of millions of dollars.
+Plotting the data
+
+Now, for plotting the data, we will use ggplot2. We want the names of players to be displayed in the bars that correspond to their salaries. Normally, text is displayed at the top of each section of the bar. This can cause problems and mess up the way the graph looks. To avoid this, we need to calculate the mid point of each section of the bars and displaying the name at the midpoint. This can be done as follows (as explained in this StackOverflow thread:
+```{r}
+salary <- ddply(salary, .(Club), transform, pos = cumsum(Base.Salary) - (0.5 * Base.Salary))
+```
+Basically, this splits the data frame by the Club variable, and then calculates the cumulative sum of salaries for that bar minus half the base salary of that specific section of the bar to find its midpoint. 
+Okay, now, let’s plot the data.
+```{r}
+ggplot(salary, aes(x = Club, y = Base.Salary, fill = Base.Salary)) +
+  geom_bar(stat = 'identity') +
+  labs(y = 'Base Salary in millions of dollars', x = '') + 
+  coord_flip() + 
+  geom_text(data = subset(salary, Base.Salary > 2), aes(label = Last.Name, y = pos)) +
+  scale_fill_gradient(low = 'springgreen4', high = 'springgreen')
+```
+which gives us the following plot:
+ 
+* labs is used to specify the labels for the axes.
+* coord_flip is used to flip the axes so that we get a horizontal bar chart instead of a vertical one.
+* geom_text is used to specify the text to include in the chart. Since some of the sections of the chart are very small and cannot fit a players name inside them, I decided to only display the name of all players whose salary is more than 2 million dollars. The position of the players’ name is determined by pos as calculated earlier.
+* scale_fill_gradient is used to specify the color gradient of the chart. The default color gradient is dark blue to blue. The full list of color names in R can be found here.
