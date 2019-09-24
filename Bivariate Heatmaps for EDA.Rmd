@@ -1,0 +1,221 @@
+---
+title: 'Bivariate Heatmaps for EDA'
+output:
+  rmdformats::readthedown:
+    highlight: pygments
+    code_folding: hide
+---
+
+<style type="text/css">
+p{ /* Normal  */
+   font-size: 14px;
+   line-height: 18px;}
+
+body{ /* Normal  */
+   font-size: 14px;}
+
+td {  /* Table  */
+   font-size: 12px;}
+
+h1 { /* Header 1 */
+ font-size: 26px;
+ color: #4294ce;}
+
+h2 { /* Header 2 */
+ font-size: 22px;}
+
+h3 { /* Header 3 */
+ font-size: 18px;}
+
+code.r{ /* Code block */
+  font-size: 12px;}
+
+pre { /* Code block */
+  font-size: 12px}
+
+#table-of-contents h2 {
+  background-color: #4294ce;}
+
+#table-of-contents{
+  background: #688FAD;}
+
+#nav-top span.glyphicon{
+  color: #4294ce;}
+
+#postamble{
+  background: #4294ce;
+  border-top: ;}
+
+</style>
+
+# Introduction
+
+This document provides an interesting way to explore data.
+
+# Data
+
+Use the [Bike Sharing Demand Dataset](https://www.kaggle.com/c/bike-sharing-demand) from a kaggle competition. Follow the link and go to the data tab, then download `train.csv`.
+
+```{r message=FALSE}
+library(dplyr)
+bike <- read.csv("~/R/data/bikeTrain.csv", na.strings = FALSE, strip.white = TRUE)
+glimpse(bike)
+```
+
+## Data Features
+```{r}
+library(kableExtra)
+features = c("datetime", "season", "holiday", "workingday", "weather", "temp", "atemp", "humidity", 
+            "windspeed", "casual", "registered", "count")
+
+tmpSeason = "1 = spring\n2 = summer\n3 = fall\n4 = winter"
+tmpWeather = paste("1: Clear, Few clouds, Partly cloudy, Partly cloudy,
+                2: Mist + Cloudy, Mist + Broken clouds, Mist + Few clouds or Mist,
+                3: Light Snow, Light Rain + Thunderstorm + Scattered clouds, Light Rain + Scattered clouds,
+                4: Heavy Rain + Ice Pallets + Thunderstorm + Mist, Snow + Fog", collapse = "\n")
+
+description = c("hourly date + timestamp", 
+                tmpSeason, 
+                "day is considered a holiday",
+                "day is neither a weekend nor holiday", 
+                linebreak(tmpWeather),
+                "temperature in Celsius", 
+                "feels like temperature in Celsius", 
+                "relative humidity",
+                "wind speed", 
+                "number of non-registered user rentals initiated",
+                "number of registered user rentals initiated", 
+                "number of total rentals")
+                
+dataFeature_df = data.frame(Features = features, Description = description)
+dataFeature_df %>% kable(escape = F) %>% 
+  kable_styling(bootstrap_options = c("striped", "condensed", "responsive")) %>% 
+  footnote(general = "The ability to create line feeds in a table cell appears broken.",
+           "A comment was entered in the GitHub repo.  Awaiting response.")
+
+```
+
+## Feature Selection
+
+Select the relationship between `atemp` and `humidity` by `season`  from the dataset. 
+
+```{r}
+library(dplyr)
+bike_data <- bike %>%  select(season, atemp, humidity) %>% glimpse()
+```
+
+Humidity Histogram
+
+```{r}
+library(ggplot2)
+bike_data %>% ggplot( aes(x=humidity) ) + geom_histogram(bins=30) + facet_wrap(~season,ncol = 2)
+```
+
+There is a higher humidity during winter (which is obvious) but you can have a sense of how it is distributed during each season.
+
+Now add the density, a density rug and change the names of the facets to create a better-looking visualization.
+
+```{r}
+bike_data %>%  mutate(season_label = case_when(
+    season == 1 ~ "Spring",
+    season == 2 ~ "Summer",
+    season == 3 ~ "fall",
+    season == 4 ~ "winter")) %>%
+  ggplot( aes(x=humidity) ) +
+  geom_histogram(bins=30,aes(y = ..density..)) +
+  geom_rug()+ geom_density()+
+  facet_wrap(~season_label,ncol = 2)+
+  ggtitle("Histogram of humidity by season")
+```
+
+atemp Histogram
+
+```{r}
+bike_data %>%  mutate(season_label = case_when(
+    season == 1 ~ "Spring",
+    season == 2 ~ "Summer",
+    season == 3 ~ "fall",
+    season == 4 ~ "winter")) %>%
+  ggplot( aes(x=atemp) ) +  geom_histogram(bins=30,aes(y = ..density..)) +
+  geom_rug() +  geom_density()+
+  facet_wrap(~season_label,ncol = 2)+
+  ggtitle("Histogram of atemp by season")
+```
+
+It is difficult based on this graphs to visualize how the features interact with each other. The first difficulty you encounter is that your histogram needs to be in 3D because you're trying to find the distribution function for the two features. 
+
+# Fitting Bivariate Distribution
+
+The goal is to visualize the bivariate distribution.  To do this first  fit a bivariate distribution to the data. This will be done using the `MASS` library and the `kde2d` function. `kde2d` estimates the bivariate distribution assuming normality for the random variables. The inputs to this function are as follows:
+
+```{r}
+inputs = c("x", "y", "n", "lims")
+description = c("x coordiante data", "y coordinate data", "number of grid points for each axis",
+                "limits for x and y")
+
+dataFeature_df = data.frame(Input = inputs, Description = description)
+dataFeature_df %>% kable(escape = F) %>% 
+  kable_styling(bootstrap_options = c("striped", "condensed", "responsive"))
+```
+
+```{r message=FALSE}
+library(MASS)
+bike_data_summer <- bike_data %>% filter(season==1)
+bike_density <- kde2d(bike_data_summer$atemp,bike_data_summer$humidity, n=1000)
+class(bike_density); str(bike_density)
+```
+
+> Note: When loading the MASS library it comes with a select function, this will have an issue with dplyr select function so to fix this when using the dplyr select you need to add dplyr:: to it like this dplyr::select() for it to work correctly.
+
+It is a list that has 3 values x, y, and z. The first two have the features values and the third one is a matrix with the value of the pdf. Take a look at the density using the contour function.
+
+```{r}
+contour(bike_density)
+text(12.2,92,"1",cex=1.5)
+points(12.2,89,col="red",pch=18)
+text(10.4,47,"2",cex=1.5)
+points(10.4,43,col="red",pch=18)
+text(21,45,"3",cex=1.5)
+points(21,40,col="red",pch=18)
+text(21.6,82,"4",cex=1.5)
+points(21.6,78,col="red",pch=18)
+```
+
+Looking at this you can identify some accumulation points that are the most frequent values for the combination of the two features. The values for each point are resumed on the following table.
+
+```{r}
+point = c(1, 2, 3, 4)
+atmp = c(12.2, 10.4, 21, 21.6)
+humm = c(89, 43, 43, 78)
+
+dataFeature_df = data.frame(Point = point, atemp = atmp, hummidity = humm)
+dataFeature_df %>% kable() %>% 
+  kable_styling(bootstrap_options = c("striped", "condensed", "responsive"))
+```
+
+# Heatmap
+
+Define the color scale you want to use using the function `colorRampPalette`.
+
+```{r}
+hm_col_scale<-colorRampPalette(c("black","blue","green","orange","red"))(1000)
+```
+
+`hm_col_scale` is a vector going from black to red using RGB code in 1000 steps.
+
+Plot the heat map using the `image` function.
+
+```{r}
+image(bike_density$z, col = hm_col_scale, zlim=c(min(bike_density$z), max(bike_density$z)))
+text(0.31, 0.46,"Most Frequent", col = "blue", cex = 0.8)
+points(0.31, 0.45, col = "blue", pch = 18)
+```
+
+This has more information than the contour plot because now the colors tell us how high the accumulation point goes. The most frequent values for `humidity` and `atemp` during `spring` is around the point $(10.4,43)$.
+
+# Next Steps
+
+Think about how could you use this to gain insight on how many bikes you have to supply for the different values of the variables based on the fact that most frequent points have a higher probability.
+
+Reference:
+https://www.datacamp.com/community/tutorials/bivariate-heatmaps

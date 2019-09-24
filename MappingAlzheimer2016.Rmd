@@ -1,0 +1,72 @@
+---
+title: "Mapping Alzheimer 2016"
+output:
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction
+
+In comparison with other statistical software (e.g., SAS, STATA, and SPSS), R is the best for data visualization. 
+
+Make a map of the prevalence of Alzheimer disease mortality by the state in the USA. The [Centers for Disease Control and Prevention](https://www.cdc.gov/nchs/pressroom/sosmap/alzheimers_mortality/alzheimers_disease.htm) provides the data for download.
+
+#Libraries and Datasets
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+if(!require(easypackages)){install.packages("easypackages")}
+library(easypackages)
+packages("tidyverse", "scales", "maps", "mapproj",  prompt = FALSE)
+```
+
+Download the .CSV file from the Centers for Disease Control and Prevention website (link is above)
+
+```{r}
+dt_ad <- read.csv("~/R/data/ALZHEIMERS2016.csv")
+head(dt_ad)
+```
+
+Load the map data of the U.S. states
+
+```{r}
+dt_states = map_data("state")
+head(dt_states)
+```             
+
+There are two datasets, one has the rate of mortality from Alzheimer disease and the other have variables with the information to create maps. Merge both datasets together but there is not a similar variable for merge. Therefore, create a new region variable form the URL variable in the first dataset and will use to merge with the second dataset. For this purpose, use the function `separate` and `gsub`. 
+
+```{r message=FALSE}
+#get the state name from URL
+dt_ad2 = dt_ad %>% 
+  separate(URL, c("a","b","c","d", "region"), sep="/") %>% select(RATE, region)
+# removing white space for mergin purposes
+dt_states2 = dt_states %>% mutate(region = gsub(" ","", region))
+# merge
+dt_final = left_join(dt_ad2, dt_states2)
+```
+
+# Visualization
+
+`dt_final` has all the variables needed to make the map.
+
+```{r}
+ggplot(dt_final, aes(x = long, y = lat, group = group, fill = RATE)) + 
+  geom_polygon(color = "white") +
+  scale_fill_gradient(
+    name = "Death Rate", 
+    low = "#fbece3", 
+    high = "#6f1873", 
+    guide = "colorbar",
+    na.value="#eeeeee", 
+    breaks = pretty_breaks(n = 5)) +
+  labs(title="Mortality of Alzheimer Disease in the U.S.", x="", y="") +
+  coord_map()
+```
+  
+  https://www.r-bloggers.com/mapping-the-prevalence-of-alzheimer-disease-mortality-in-the-usa/
+  
