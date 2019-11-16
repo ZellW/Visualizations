@@ -43,7 +43,7 @@ packages("tidyverse", "lubridate", "quantmod", "scales", "zoo", prompt = T)
 set.seed(123)
 options(digits = 3)
 
-setwd("~/R/Complete")
+setwd("~/GitHub/Visualizations")
 ```
 
 # Introduction
@@ -56,7 +56,7 @@ Use stock data in the form of daily closing prices for the SPY - SPDR S&P 500 ET
 
 `Quantmod` - `getSymbols` takes a stock ticker parameter, a flag to determine whether we want a variable containing the data generated automatically without arrow assignment (`auto.assign`), and the start date of the time series of stock prices that we want to retrieve (`from`).
 
-```{r}
+```{r message=FALSE, warning=FALSE}
 stock_xts <- getSymbols("SPY", auto.assign = FALSE, from="2018-01-01")
 ```
 
@@ -86,16 +86,13 @@ head(stock_df)
 - return a column showing the percentage change in value from the previous day when we map it to a color palette
 
 ```{r}
-stock_df %>%
-  mutate(year = year(Index),
-         month = month(Index, label = TRUE),
-         wkday = fct_relevel(wday(Index, label=TRUE),
-                             c("Mon", "Tue","Wed","Thu","Fri","Sat","Sun")
-                             ),
-         day = day(Index),
-         wk = format(Index, "%W"),
-         returns = (.[[5]] - lag(.[[5]]))/lag(.[[5]])) %>%
-  select(year, month, wkday, day, wk, returns) 
+stock_df <- stock_df %>% mutate(year = year(Index),
+                                month = month(Index, label = TRUE),
+                                wkday = fct_relevel(wday(Index, label=TRUE),
+                                                    c("Mon", "Tue","Wed","Thu","Fri","Sat","Sun")),
+                                day = day(Index), wk = format(Index, "%W"),
+                                returns = (.[[5]] - lag(.[[5]]))/lag(.[[5]])) %>%
+     select(year, month, wkday, day, wk, returns) 
 ```
 
 - Using `fct_relevel` on the output of `wday` to specify the order of the days. On the y axis of the calendar heatmap, want days to start from Monday at the bottom, and not Sunday (which is the default ordering that `lubridate::wday` produces).
@@ -111,7 +108,7 @@ stock_df %>%
 Once those columns have been created, we will select and pipe them to ggplot. The wk column, representing weeks of the year, is passed to the x axis, while the wkday column, representing the day of the week, is passed to the y axis. We set fill=returns since we are coloring an area by this variable. geom_tile is added, with color='black' since we want the borders of each square to be black (remember that fill colors in areas such as bars, and color adds color to single dimension objects such as dots and lines). We then add geom_text with label=day in order to have the day of the month overlayed on each square that has a value (return) associated with it.
 
 ```{r}
-  select(year, month, wkday, day, wk, 5, returns) %>% 
+  stock_df %>%  select(year, month, wkday, day, wk, 5, returns) %>% 
     ggplot(aes(wk, wkday, fill=returns)) +
       geom_tile(color='black') +
       geom_text(aes(label=day), size=3) + 
@@ -149,49 +146,6 @@ Once those columns have been created, we will select and pipe them to ggplot. Th
 `facet_grid`
 
 - `scales = "free"` allows each month section to show only the week numbers that are present for that month, and not the full 52 of the year repeated for each month.
-
-
-The code:
-library(tidyverse)
-library(lubridate)
-library(quantmod)
-library(scales)
-library(zoo)
-library(kableExtra)
-
-stock_xts <- getSymbols("SPY", auto.assign = FALSE, from="2018-01-01")
-stock_df <- fortify.zoo(stock_xts)
-
-stock_df %>%
-  mutate(year = year(Index),
-         month = month(Index, label = TRUE),
-         wkday = fct_relevel(wday(Index, label=TRUE),
-                             c("Mon", "Tue","Wed","Thu","Fri","Sat","Sun")
-                             ),
-         day = day(Index),
-         wk = format(Index, "%W"),
-         returns = (.[[5]] - lag(.[[5]]))/lag(.[[5]])) %>%
-  select(year, month, wkday, day, wk, returns) %>% 
-    ggplot(aes(wk, wkday, fill=returns)) +
-      geom_tile(color='black') +
-      geom_text(aes(label=day), size=3) + 
-      labs(x='', 
-           y='',
-           title="SPY") +
-      scale_fill_distiller(type="div" 
-                           ,palette=7
-                           ,na.value = 'white' 
-                           ,limits=c(-.055, .055)
-                           ,labels = percent
-                           ,direction=1
-                           ) +
-      theme(panel.background = element_blank(),
-            axis.ticks = element_blank(),
-            axis.text.x = element_blank(),
-            strip.background = element_rect("grey92")
-            ) +
-      facet_grid(year~month, scales="free", space="free")
-
 
 # Reference:
 https://ryanplant.netlify.com/post/calendar-heatmaps-in-ggplot/

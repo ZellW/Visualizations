@@ -1,0 +1,123 @@
+---
+title: "Stacked Chicklets Plotting"
+output:
+  rmdformats::readthedown:
+    highlight: pygments
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+setwd("~/GitHub/Visualizations")
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+if(!require(easypackages)){install.packages("easypackages")}
+library(easypackages)
+packages("hrbrthemes", "ggchicklet", "tidyverse", prompt = FALSE)
+```
+
+# Introduction to the Data
+
+[DMARC](https://dmarc.org/overview/), which stands for _Domain-based Message Authentication, Reporting & Conformanc_, is an email authentication, policy, and reporting protocol. It builds on the widely deployed SPF and DKIM protocols, adding linkage to the author (“From:”) domain name, published policies for recipient handling of authentication failures, and reporting from receivers to senders, to improve and monitor protection of the domain from fraudulent email.
+
+At a high level, DMARC is designed to satisfy the following requirements:
+
+- Minimize false positives
+- Provide robust authentication reporting
+- Assert sender policy at receivers
+- Reduce successful phishing delivery
+- Work at Internet scale
+- Minimize complexity
+
+## Anatomy of a DMARC Resource Record
+
+DMARC policies are published in the DNS as text (TXT) resource records (RR) and announce what an email receiver should do with non-aligned mail it receives.
+
+Consider an example DMARC TXT RR for the domain “sender.dmarcdomain.com” that reads:
+
+`"v=DMARC1;p=reject;pct=100;rua=mailto:postmaster@dmarcdomain.com"`
+
+In this example, the sender requests that the receiver outright reject all non-aligned messages and send a report, in a specified aggregate format, about the rejections to a specified address. If the sender was testing its configuration, it could replace _reject_ with _quarantine_ which would tell the receiver they shouldn’t necessarily reject the message, but consider quarantining it.
+DMARC records follow the extensible “tag-value” syntax for DNS-based key records defined in DKIM. The following chart illustrates some of the available tags:
+
+```{r echo=FALSE}
+tibble::tribble(
+      ~Tag.Name,                                        ~Purpose,                           ~Sample,
+            "v",                              "Protocol version",                        "v=DMARC1",
+          "pct", "Percentage of messages subjected to filtering",                          "pct=20",
+          "ruf",            "Reporting URI for forensic reports", "ruf=mailto:authfail@example.com",
+          "rua",            "Reporting URI of aggregate reports",   "rua=mailto:aggrep@example.com",
+            "p",              "Policy for organizational domain",                    "p=quarantine",
+           "sp",               "Policy for subdomains of the OD",                       "sp=reject",
+        "adkim",                       "Alignment mode for DKIM",                         "adkim=s",
+         "aspf",                        "Alignment mode for SPF",                          "aspf=r"
+      )
+```
+
+# Data
+
+```{r}
+# https://rud.is/dl/f500-industry-dmarc.csv.gz
+f500_dmarc <- read_csv("data/f500-industry-dmarc.csv.gz", col_types = "cc")
+
+f500_dmarc %>% head(10)
+```
+
+The `p` column is the DMARC classification for each organization (org names have been withheld to protect the irresponsible) and comes from the `p=…` value in the DMARC DNS `TXT` record field. It has a limited set of values, so  enumerate them and assign some colors:
+
+```{r}
+dmarc_levels <- c("No DMARC", "None", "Quarantine", "Reject")
+dmarc_cols <- set_names(c("#617a89", "#a6dba0", "#5aae61", "#1b7837"), dmarc_levels) # color paltett from hrbrthemes
+```
+
+Aggregate value of each `p`:
+
+```{r}
+dmarc_summary <- count(f500_dmarc, industry, p)
+dmarc_summary %>% head(10)
+```
+
+Sort the industries by those with the most DMARC (sorted bars/chicklets FTW!). Need a factor for that:
+
+```{r}
+industry_levels <- dmarc_summary %>% filter(p != "No DMARC") %>% count(industry, wt = n, sort = TRUE) 
+industry_levels %>% head(10)
+```
+
+# Make the chart:
+
+```{r warning=FALSE}
+dmarc_summary %>% 
+  mutate(p = factor(p, levels = rev(dmarc_levels))) %>% 
+  mutate(industry = factor(industry, rev(industry_levels$industry))) %>% 
+  ggplot(aes(industry, n)) +
+  geom_chicklet(aes(fill = p), position = position_fill()) +
+  scale_fill_manual(name = NULL, values = dmarc_cols) +
+  scale_y_continuous(expand = c(0,0), position = "right") +
+  coord_flip() + labs(x = NULL, y = NULL, title = "DMARC Status of Fortune 500 (2017 List; 2018 Measurement) Primary Email Domains") +
+  theme_ipsum_rc(grid = "X") + theme(legend.position = "top")
+```
+
+Forgot to use `reverse = TRUE` in the call to `position_fill()` everything is out of order. Kinda. It’s in the order we told it to be in, but that’s not right b/c we need it ordered by the in-industry percentages. If each industry had the same number of organizations, there would not have been an issue. Unfortunately, the folks who make up these lists care not about our time. Re-compute the industry factor by computing the percents:
+
+```{r}
+industry_levels <- dmarc_summary %>% group_by(industry) %>% mutate(pct = n/sum(n)) %>% ungroup() %>% 
+      filter(p != "No DMARC") %>% count(industry, wt = pct, sort = TRUE)
+industry_levels %>% head(10)
+```
+
+Return to using `position_fill()` as before:
+
+```{r warning=FALSE}
+dmarc_summary %>% 
+  mutate(p = factor(p, levels = rev(dmarc_levels))) %>% 
+  mutate(industry = factor(industry, rev(industry_levels$industry))) %>% 
+  ggplot(aes(industry, n)) +
+  geom_chicklet(aes(fill = p), position = position_fill(reverse = TRUE)) +
+  scale_fill_manual(name = NULL, values = dmarc_cols) + scale_y_percent(expand = c(0, 0.001), position = "right") +
+  coord_flip() + labs(x = NULL, y = NULL, title = "DMARC Status of Fortune 500 (2017 List; 2018 Measurement) Primary Email Domains") +
+  theme_ipsum_rc(grid = "X") + theme(legend.position = "top")
+```
+
+# Reference:
+https://rud.is/b/2019/09/27/100-stacked-chicklets/
